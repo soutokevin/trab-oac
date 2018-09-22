@@ -1,8 +1,8 @@
 .data
+  open_error_msg: .asciiz "\nError while opening file\n"
   error_msg: .asciiz "\nInvalid file\n"
   path: .asciiz "images/lena.bmp"
   file: .word 0
-  size: .word 0
   header: .space 40
 
 .text
@@ -12,8 +12,8 @@
   li $v0, 13   # open file syscall code
   syscall
 
-  tlt $v0, $zero # Force program to stop if failed to open the file
-  sw $v0, file   # Store file descriptor
+  blt $v0, $zero, open_error # Stop program if failed to open the file
+  sw $v0, file               # Store file descriptor
 
   # Load file header info
   move $a0, $v0
@@ -25,12 +25,12 @@
   # The first byte must be a letter 'B'
   lbu $t1, 0($a1)
   li $t2, 'B'
-  tne $t1, $t2
+  bne $t1, $t2, invalid_file
 
   # The second byte must be a letter 'M'
   lbu $t1, 1($a1)
   li $t2, 'M'
-  tne $t1, $t2
+  bne $t1, $t2, invalid_file
 
   # Load image header
   lw $a0, file
@@ -40,15 +40,8 @@
 
   la $s0, header             # Load header base address
 
-  lhu $a0, 14($s0)           # Load pixel size in bits
-  li $v0, 1                  # Print Integer syscall
-  syscall                    # Print read pixel size
-  bne $a0, 24, invalid_file  # Only 24-bit images are supported
-
-  # Print a single space char
-  li $a0, ' '
-  li $v0, 11
-  syscall
+  lw $t0, 0($s0)             # Load actual header size
+  bne $t0, 40, invalid_file  # Header size must be 40
 
   lw $a0, 4($s0)             # Load image width
   li $v0, 1                  # Print Integer syscall
@@ -63,6 +56,9 @@
   li $v0, 1                  # Print Integer syscall
   syscall                    # Print image height
 
+  lhu $t0, 14($s0)           # Load pixel size in bits
+  bne $t0, 24, invalid_file  # Only 24-bit images are supported
+
 exit:
   li $v0, 10
   syscall
@@ -76,3 +72,11 @@ invalid_file:
   li $a0, 1
   syscall
 
+open_error:
+  li $v0, 4
+  la $a0, open_error_msg
+  syscall
+
+  li $v0, 17
+  li $a0, 2
+  syscall
