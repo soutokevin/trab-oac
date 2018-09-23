@@ -68,12 +68,15 @@ paint_line:
   syscall
 
   la $t8, buffer             # Start of loaded file content
-  la $t9, buffer + 1536      # End of loaded file content
+  la $t9, buffer + 1536    # End of loaded file content
+
+  addi $s0, $s0, -2048
 
 paint_pixel:
-  lbu $t0, 2($t9)            # Load red component
-  lbu $t1, 1($t9)            # Load green component
-  lbu $t2, 0($t9)            # Load blue component
+
+  lbu $t0, 2($t8)            # Load red component
+  lbu $t1, 1($t8)            # Load green component
+  lbu $t2, 0($t8)            # Load blue component
 
   sll $t0, $t0, 16           # Prepare component to be joined; red   <<= 16
   sll $t1, $t1, 8            # Prepare component to be joined; green <<=  8
@@ -83,10 +86,11 @@ paint_pixel:
 
   sw $t0, 0($s0)             # Paint pixel
 
-  addi $s0, $s0, -4           # Update screen address
-  addi $t9, $t9, -3           # Update file address
+  addi $s0, $s0, 4           # Update screen address
+  addi $t8, $t8, 3           # Update file address
   blt $t8, $t9, paint_pixel  # Are we done with this line?
-
+  
+  addi $s0, $s0, -2048
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
 
