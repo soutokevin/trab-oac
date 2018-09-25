@@ -2,13 +2,27 @@
   screen: .space 1048576 # Reserve space for the bitmap display at 512x512
   open_error_msg: .asciiz "\nError while opening file\n"
   error_msg: .asciiz "\nInvalid file\n"
-  path: .asciiz "images/lena.bmp"
+  open_msg: .asciiz "Input path: "
+  path: .space 500
   width: .word 0
   height: .word 0
   file: .word 0
   buffer: .space 1536
 
 .text
+  # Request path from the user
+  la $a0, open_msg
+  li $v0, 4
+  syscall
+
+  # Get user input
+  la $a0, path
+  li $a1, 500
+  li $v0, 8
+  syscall
+
+  jal remove_char # Remove ending \n
+
   la $a0, path # set image path
   li $a1, 0    # read only mode
   li $a2, 0    # ??
@@ -123,3 +137,12 @@ open_error:
   li $v0, 17
   li $a0, 2
   syscall
+
+# a0: address to a null-terminated string; MUST HAVE LENGTH >= 1
+remove_char:
+  lbu $t0, 0($a0)
+  addiu $a0, $a0, 1
+  bnez $t0, remove_char
+
+  sb $zero, -2($a0)
+  jr $ra
