@@ -58,7 +58,7 @@
   beq $t0, $zero, paint      # Do we have any more header data to read?
   tgei $t0, 1536             # Trap if header is too big
 
-  # Just discard the res of the header
+  # Just discard the rest of the header
   lw $a0, file
   move $a2, $t0
   li $v0, 14
