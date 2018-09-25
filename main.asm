@@ -43,9 +43,6 @@
 
   la $s0, buffer             # Load header base address
 
-  lw $t0, 0($s0)             # Load actual header size
-  bne $t0, 40, invalid_file  # Header size must be 40
-
   lw $a0, 4($s0)             # Load image width
   sw $a0, width              # Store image width
 
@@ -55,6 +52,19 @@
   lhu $t0, 14($s0)           # Load pixel size in bits
   bne $t0, 24, invalid_file  # Only 24-bit images are supported
 
+  lw $t0, 0($s0)             # Load actual header size
+  addi $t0, $t0, -40         # How many bytes are left to read?
+
+  beq $t0, $zero, paint      # Do we have any more header data to read?
+  tgei $t0, 1536             # Trap if header is too big
+
+  # Just discard the res of the header
+  lw $a0, file
+  move $a2, $t0
+  li $v0, 14
+  syscall
+
+paint:
   la $s0, screen + 1048576   # s0 is the end of the screen
   lw $s1, height             # s1 will count how many lines are left to paint
 
