@@ -55,12 +55,11 @@
   lhu $t0, 14($s0)           # Load pixel size in bits
   bne $t0, 24, invalid_file  # Only 24-bit images are supported
 
-  la $s0, screen             # s0 is the base address of the screen
-  addi $s0, $s0, 1048576
+  la $s0, screen + 1048576   # s0 is the end of the screen
   lw $s1, height             # s1 will count how many lines are left to paint
 
 paint_line:
-  # Load 1536 bytes (a full line) of pixel data
+  # Load 1536 bytes (a full line) of pixel data into the buffer
   lw $a0, file
   la $a1, buffer
   li $a2, 1536
@@ -68,12 +67,11 @@ paint_line:
   syscall
 
   la $t8, buffer             # Start of loaded file content
-  la $t9, buffer + 1536    # End of loaded file content
+  la $t9, buffer + 1536      # End of loaded file content
 
   addi $s0, $s0, -2048
 
 paint_pixel:
-
   lbu $t0, 2($t8)            # Load red component
   lbu $t1, 1($t8)            # Load green component
   lbu $t2, 0($t8)            # Load blue component
@@ -89,7 +87,7 @@ paint_pixel:
   addi $s0, $s0, 4           # Update screen address
   addi $t8, $t8, 3           # Update file address
   blt $t8, $t9, paint_pixel  # Are we done with this line?
-  
+
   addi $s0, $s0, -2048
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
