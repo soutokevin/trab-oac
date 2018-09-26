@@ -2,13 +2,27 @@
   screen: .space 1048576 # Reserve space for the bitmap display at 512x512
   open_error_msg: .asciiz "\nError while opening file\n"
   error_msg: .asciiz "\nInvalid file\n"
-  path: .asciiz "images/lena.bmp"
+  open_msg: .asciiz "Input path: "
+  path: .space 500
   width: .word 0
   height: .word 0
   file: .word 0
   buffer: .space 1536
 
 .text
+  # Request path from the user
+  la $a0, open_msg
+  li $v0, 4
+  syscall
+
+  # Get user input
+  la $a0, path
+  li $a1, 500
+  li $v0, 8
+  syscall
+
+  jal remove_char # Remove ending \n
+
   la $a0, path # set image path
   li $a1, 0    # read only mode
   li $a2, 0    # ??
@@ -43,9 +57,6 @@
 
   la $s0, buffer             # Load header base address
 
-  lw $t0, 0($s0)             # Load actual header size
-  bne $t0, 40, invalid_file  # Header size must be 40
-
   lw $a0, 4($s0)             # Load image width
   sw $a0, width              # Store image width
 
@@ -55,12 +66,24 @@
   lhu $t0, 14($s0)           # Load pixel size in bits
   bne $t0, 24, invalid_file  # Only 24-bit images are supported
 
-  la $s0, screen             # s0 is the base address of the screen
-  addi $s0, $s0, 1048576
+  lw $t0, 0($s0)             # Load actual header size
+  addi $t0, $t0, -40         # How many bytes are left to read?
+
+  beq $t0, $zero, paint      # Do we have any more header data to read?
+  tgei $t0, 1536             # Trap if header is too big
+
+  # Just discard the rest of the header
+  lw $a0, file
+  move $a2, $t0
+  li $v0, 14
+  syscall
+
+paint:
+  la $s0, screen + 1048576   # s0 is the end of the screen
   lw $s1, height             # s1 will count how many lines are left to paint
 
 paint_line:
-  # Load 1536 bytes (a full line) of pixel data
+  # Load 1536 bytes (a full line) of pixel data into the buffer
   lw $a0, file
   la $a1, buffer
   li $a2, 1536
@@ -68,12 +91,11 @@ paint_line:
   syscall
 
   la $t8, buffer             # Start of loaded file content
-  la $t9, buffer + 1536    # End of loaded file content
+  la $t9, buffer + 1536      # End of loaded file content
 
   addi $s0, $s0, -2048
 
 paint_pixel:
-
   lbu $t0, 2($t8)            # Load red component
   lbu $t1, 1($t8)            # Load green component
   lbu $t2, 0($t8)            # Load blue component
@@ -89,7 +111,7 @@ paint_pixel:
   addi $s0, $s0, 4           # Update screen address
   addi $t8, $t8, 3           # Update file address
   blt $t8, $t9, paint_pixel  # Are we done with this line?
-  
+
   addi $s0, $s0, -2048
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
@@ -115,3 +137,12 @@ open_error:
   li $v0, 17
   li $a0, 2
   syscall
+
+# a0: address to a null-terminated string; MUST HAVE LENGTH >= 1
+remove_char:
+  lbu $t0, 0($a0)
+  addiu $a0, $a0, 1
+  bnez $t0, remove_char
+
+  sb $zero, -2($a0)
+  jr $ra
