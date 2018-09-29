@@ -2,16 +2,18 @@
   screen: .space 1048576 # Reserve space for the bitmap display at 512x512
   open_error_msg: .asciiz "\nError while opening file\n"
   error_msg: .asciiz "\nInvalid file\n"
-  open_msg: .asciiz "Input path: "
+  input_msg: .asciiz "Input path: "
+  output_msg: .asciiz "Output path: "
   path: .space 500
   width: .word 0
   height: .word 0
-  file: .word 0
+  input: .word 0
+  output: .word 0
   buffer: .space 1536
 
 .text
   # Request path from the user
-  la $a0, open_msg
+  la $a0, input_msg
   li $v0, 4
   syscall
 
@@ -30,10 +32,32 @@
   syscall
 
   blt $v0, $zero, open_error # Stop program if failed to open the file
-  sw $v0, file               # Store file descriptor
+  sw $v0, input              # Store file descriptor
+
+  # Request output path from the user
+  la $a0, output_msg
+  li $v0, 4
+  syscall
+
+  # Get user input
+  la $a0, path
+  li $a1, 500
+  li $v0, 8
+  syscall
+
+  jal remove_char # Remove ending \n
+
+  la $a0, path # set image path
+  li $a1, 1    # write mode
+  li $a2, 0    # ??
+  li $v0, 13   # open file syscall code
+  syscall
+
+  blt $v0, $zero, open_error # Stop program if failed to open the file
+  sw $v0, output             # Store file descriptor
 
   # Load file header info
-  move $a0, $v0
+  lw $a0, input
   la $a1, buffer
   li $a2, 14
   li $v0, 14
@@ -50,7 +74,7 @@
   bne $t1, $t2, invalid_file
 
   # Load image header
-  lw $a0, file
+  lw $a0, input
   li $a2, 40
   li $v0, 14
   syscall
@@ -73,7 +97,7 @@
   tgei $t0, 1536             # Trap if header is too big
 
   # Just discard the rest of the header
-  lw $a0, file
+  lw $a0, input
   move $a2, $t0
   li $v0, 14
   syscall
@@ -84,7 +108,7 @@ paint:
 
 paint_line:
   # Load 1536 bytes (a full line) of pixel data into the buffer
-  lw $a0, file
+  lw $a0, input
   la $a1, buffer
   li $a2, 1536
   li $v0, 14
