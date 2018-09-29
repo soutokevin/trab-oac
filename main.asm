@@ -5,8 +5,6 @@
   input_msg: .asciiz "Input path: "
   output_msg: .asciiz "Output path: "
   path: .space 500
-  width: .word 0
-  height: .word 0
   input: .word 0
   output: .word 0
   buffer: .space 1536
@@ -49,11 +47,10 @@
 
   la $s0, buffer             # Load header base address
 
-  lw $a0, 4($s0)             # Load image width
-  sw $a0, width              # Store image width
-
-  lw $a0, 8($s0)             # Load image height
-  sw $a0, height             # Store image height
+  lw $t0, 4($s0)             # Load image width
+  bne $t0, 512, invalid_file # Image width must be 512
+  lw $t0, 8($s0)             # Load image height
+  bne $t0, 512, invalid_file # Image height also must be 512
 
   lhu $t0, 14($s0)           # Load pixel size in bits
   bne $t0, 24, invalid_file  # Only 24-bit images are supported
@@ -72,7 +69,7 @@
 
 paint:
   la $s0, screen + 1048576   # s0 is the end of the screen
-  lw $s1, height             # s1 will count how many lines are left to paint
+  li $s1, 512                # s1 will count how many lines are left to paint
 
 paint_line:
   # Load 1536 bytes (a full line) of pixel data into the buffer
