@@ -12,49 +12,17 @@
   buffer: .space 1536
 
 .text
-  # Request path from the user
+  # Request input path from the user
   la $a0, input_msg
-  li $v0, 4
-  syscall
-
-  # Get user input
-  la $a0, path
-  li $a1, 500
-  li $v0, 8
-  syscall
-
-  jal remove_char # Remove ending \n
-
-  la $a0, path # set image path
-  li $a1, 0    # read only mode
-  li $a2, 0    # ??
-  li $v0, 13   # open file syscall code
-  syscall
-
-  blt $v0, $zero, open_error # Stop program if failed to open the file
-  sw $v0, input              # Store file descriptor
+  la $a1, input
+  li $a2, 0
+  jal open_file
 
   # Request output path from the user
   la $a0, output_msg
-  li $v0, 4
-  syscall
-
-  # Get user input
-  la $a0, path
-  li $a1, 500
-  li $v0, 8
-  syscall
-
-  jal remove_char # Remove ending \n
-
-  la $a0, path # set image path
-  li $a1, 1    # write mode
-  li $a2, 0    # ??
-  li $v0, 13   # open file syscall code
-  syscall
-
-  blt $v0, $zero, open_error # Stop program if failed to open the file
-  sw $v0, output             # Store file descriptor
+  la $a1, output
+  li $a2, 1
+  jal open_file
 
   # Load file header info
   lw $a0, input
@@ -143,6 +111,43 @@ paint_pixel:
 exit:
   li $v0, 10
   syscall
+
+# a0: Address of a message to present the user
+# a1: Address to store the file descriptor
+# a2: Open mode
+open_file:
+  addi $sp, $sp, -12
+  sw $ra, 0($sp)
+  sw $a1, 4($sp)
+  sw $a2, 8($sp)
+
+  # Request path from the user
+  li $v0, 4
+  syscall
+
+  # Get user input
+  la $a0, path
+  li $a1, 500
+  li $v0, 8
+  syscall
+
+  jal remove_char            # Remove ending \n from the input
+
+  la $a0, path               # Set image path
+  lw $a1, 8($sp)             # Get open mode
+  li $a2, 0                  # ??
+  li $v0, 13                 # Open file syscall code
+  syscall
+
+  blt $v0, $zero, open_error # Stop program if failed to open the file
+
+  lw $t0, 4($sp)             # Get file descriptor address
+  sw $v0, ($t0)              # Store file descriptor
+
+  # a1 and a2 are not restored
+  lw $ra, 0($sp)
+  addi $sp, $sp, 12
+  jr $ra
 
 invalid_file:
   li $v0, 4
