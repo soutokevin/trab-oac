@@ -10,6 +10,8 @@
   buffer: .space 1536
 
 .text
+
+main:
   # Request input path from the user
   la $a0, input_msg
   la $a1, input
@@ -26,34 +28,9 @@
   lw $a0, input
   jal read_file_header
 
-  # Load image header
+  # Validate image header
   lw $a0, input
-  la $a1, buffer
-  li $a2, 40
-  li $v0, 14
-  syscall
-
-  la $s0, buffer             # Load header base address
-
-  lw $t0, 4($s0)             # Load image width
-  bne $t0, 512, invalid_file # Image width must be 512
-  lw $t0, 8($s0)             # Load image height
-  bne $t0, 512, invalid_file # Image height also must be 512
-
-  lhu $t0, 14($s0)           # Load pixel size in bits
-  bne $t0, 24, invalid_file  # Only 24-bit images are supported
-
-  lw $t0, 0($s0)             # Load actual header size
-  addi $t0, $t0, -40         # How many bytes are left to read?
-
-  beq $t0, $zero, paint      # Do we have any more header data to read?
-  tgei $t0, 1536             # Trap if header is too big
-
-  # Just discard the rest of the header
-  lw $a0, input
-  move $a2, $t0
-  li $v0, 14
-  syscall
+  jal read_image_header
 
 paint:
   la $s0, screen + 1048576   # s0 is the end of the screen
@@ -151,6 +128,41 @@ read_file_header:
   # The second byte must be a letter 'M'
   lbu $t0, 1($a1)
   bne $t0, 'M', invalid_file
+
+  jr $ra
+
+# $a0: file descriptor
+read_image_header:
+  # Load image header
+  la $a1, buffer
+  li $a2, 40
+  li $v0, 14
+  syscall
+
+  lw $t0, 0($a1)                 # Load actual header size
+  addi $t1, $t0, -40             # How many bytes are left to read?
+
+  lw $t0, 4($a1)                 # Load image width
+  bne $t0, 512, invalid_file     # Image width must be 512
+
+  lw $t0, 8($a1)                 # Load image height
+  bne $t0, 512, invalid_file     # Image height also must be 512
+
+  lhu $t0, 14($a1)               # Load pixel size in bits
+  bne $t0, 24, invalid_file      # Only 24-bit images are supported
+
+  bne $t1, $zero, discard_header # Do we have any more header data to read?
+  jr $ra
+
+# $a0: file descriptor
+# $a1: buffer to be used
+discard_header:
+  tgei $t0, 1536                 # Trap if header is too big
+
+  # Discard the rest of the header
+  move $a2, $t0
+  li $v0, 14
+  syscall
 
   jr $ra
 
