@@ -140,7 +140,7 @@ read_image_header:
   syscall
 
   lw $t0, 0($a1)                 # Load actual header size
-  addi $t1, $t0, -40             # How many bytes are left to read?
+  addi $a2, $t0, -40             # How many bytes are left to read?
 
   lw $t0, 4($a1)                 # Load image width
   bne $t0, 512, invalid_file     # Image width must be 512
@@ -151,16 +151,16 @@ read_image_header:
   lhu $t0, 14($a1)               # Load pixel size in bits
   bne $t0, 24, invalid_file      # Only 24-bit images are supported
 
-  bne $t1, $zero, discard_header # Do we have any more header data to read?
+  bne $a2, $zero, discard_header # Do we have any more header data to read?
   jr $ra
 
 # $a0: file descriptor
 # $a1: buffer to be used
+# $a2: bytes left
 discard_header:
   tgei $t0, 1536                 # Trap if header is too big
 
   # Discard the rest of the header
-  move $a2, $t0
   li $v0, 14
   syscall
 
