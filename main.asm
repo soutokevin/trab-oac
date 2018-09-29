@@ -22,25 +22,13 @@
   li $a2, 1
   jal open_file
 
-  # Load file header info
+  # Validate input file header
   lw $a0, input
-  la $a1, buffer
-  li $a2, 14
-  li $v0, 14
-  syscall
-
-  # The first byte must be a letter 'B'
-  lbu $t1, 0($a1)
-  li $t2, 'B'
-  bne $t1, $t2, invalid_file
-
-  # The second byte must be a letter 'M'
-  lbu $t1, 1($a1)
-  li $t2, 'M'
-  bne $t1, $t2, invalid_file
+  jal read_file_header
 
   # Load image header
   lw $a0, input
+  la $a1, buffer
   li $a2, 40
   li $v0, 14
   syscall
@@ -144,6 +132,26 @@ open_file:
   # a1 and a2 are not restored
   lw $ra, 0($sp)
   addi $sp, $sp, 12
+  jr $ra
+
+# $a0: file descriptor
+read_file_header:
+  # Load file header info
+  la $a1, buffer
+  li $a2, 14
+  li $v0, 14
+  syscall
+
+  tnei $v0, 14 # Trap in case of error
+
+  # The first byte must be a letter 'B'
+  lbu $t0, 0($a1)
+  bne $t0, 'B', invalid_file
+
+  # The second byte must be a letter 'M'
+  lbu $t0, 1($a1)
+  bne $t0, 'M', invalid_file
+
   jr $ra
 
 invalid_file:
