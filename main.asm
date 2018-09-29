@@ -18,12 +18,6 @@ main:
   li $a2, 0
   jal open_file
 
-  # Request output path from the user
-  la $a0, output_msg
-  la $a1, output
-  li $a2, 1
-  jal open_file
-
   # Validate input file header
   lw $a0, input
   jal read_file_header
@@ -69,6 +63,12 @@ paint_pixel:
   addi $s0, $s0, -2048
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
+
+  # Request output path from the user
+  la $a0, output_msg
+  la $a1, output
+  li $a2, 1
+  jal open_file
 
 exit:
   li $v0, 10
