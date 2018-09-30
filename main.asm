@@ -66,6 +66,10 @@ paint_pixel:
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
 
+# --------------------------------------------------------------------------- #
+#                                 Output file                                 #
+# --------------------------------------------------------------------------- #
+
   # Request output path from the user
   la $a0, output_msg
   la $a1, output
@@ -80,34 +84,34 @@ paint_pixel:
 
   la $s0, screen             # s0 is the start of the screen
   li $s1, 512                # How many lines are left?
-  li $s2, 512                # How many pixels are left in this line?
-  li $a2, 1536
+  li $s2, 512                # How many pixels are left in the current line?
+  li $a2, 1536               # The size of each line when written in the file
 
-  lw $a0, output
-  la $a1, buffer
+  lw $a0, output             # Load file decriptor
+  la $a1, buffer             # Load buffer address
 
 write:
-  lw $t0, 0($s0)
+  lw $t0, 0($s0)             # Get color value
 
-  sb $t0, 0($a1)            # Write blue component
-  srl $t0, $t0, 8
-  sb $t0, 1($a1)            # Write green component
-  srl $t0, $t0, 8
-  sb $t0, 2($a1)            # Write red component
+  sb $t0, 0($a1)             # Write blue component
+  srl $t0, $t0, 8            # Prepare green component
+  sb $t0, 1($a1)             # Write green component
+  srl $t0, $t0, 8            # Prepare red component
+  sb $t0, 2($a1)             # Write red component
 
-  addi $s0, $s0, 4
-  addi $a1, $a1, 3
-  addi $s2, $s2, -1
-  bnez $s2, write
+  addi $s0, $s0, 4           # Update pointer to the screen
+  addi $a1, $a1, 3           # Update pointer to output buffer
+  addi $s2, $s2, -1          # Decrement counter of pixels written
+  bnez $s2, write            # Are we done with this line?
 
-  li $s2, 512                # How many pixels are left in this line?
-  la $a1, buffer
+  li $s2, 512                # Reset pixels counter
+  la $a1, buffer             # Reset buffer pointer
 
-  li $v0, 15
+  li $v0, 15                 # Write file syscall code
   syscall
 
-  addi $s1, $s1, -1
-  bnez $s1, write
+  addi $s1, $s1, -1          # Decrement line counter
+  bnez $s1, write            # Are we done?
 
 # --------------------------------------------------------------------------- #
 #                                  Functions                                  #
