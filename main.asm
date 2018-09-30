@@ -70,6 +70,9 @@ paint_pixel:
   li $a2, 1
   jal open_file
 
+  lw $a0, output
+  jal write_file_header
+
 exit:
   li $v0, 10
   syscall
@@ -163,6 +166,39 @@ discard_header:
   # Discard the rest of the header
   li $v0, 14
   syscall
+
+  jr $ra
+
+# $a0: file descriptor
+write_file_header:
+  la $a1, buffer
+
+  # The first byte is a letter 'B'
+  li $t0, 'B'
+  sb $t0, 0($a1)
+
+  # The second byte is a letter 'M'
+  li $t0, 'M'
+  sb $t0, 1($a1)
+
+  # Total file size
+  li $t0, 786486
+  usw $t0, 2($a1)
+
+  # Reserved bytes (must be zero)
+  sh $zero, 6($a1)
+  sh $zero, 8($a1)
+
+  # Offset
+  li $t0, 54
+  usw $t0, 10($a1)
+
+  # Write file header
+  li $a2, 14
+  li $v0, 15
+  syscall
+
+  tnei $v0, 14 # Trap in case of error
 
   jr $ra
 
