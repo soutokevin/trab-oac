@@ -82,7 +82,7 @@ paint_pixel:
   lw $a0, output
   jal write_image_header
 
-  la $s0, screen             # s0 is the start of the screen
+  la $s0, screen + 1046528   # s0 is the start of the last line of the screen
   li $s1, 512                # How many lines are left?
   li $s2, 512                # How many pixels are left in the current line?
   li $a2, 1536               # The size of each line when written in the file
@@ -106,6 +106,7 @@ write:
 
   li $s2, 512                # Reset pixels counter
   la $a1, buffer             # Reset buffer pointer
+  addi $s0, $s0, -4096       # Update pointer to the start of the previous line
 
   li $v0, 15                 # Write file syscall code
   syscall
