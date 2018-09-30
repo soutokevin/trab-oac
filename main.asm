@@ -8,6 +8,7 @@
   input: .word 0
   output: .word 0
   buffer: .space 1536
+  new_image: .space 1048576
 
 .text
 
