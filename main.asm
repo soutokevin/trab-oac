@@ -73,6 +73,9 @@ paint_pixel:
   lw $a0, output
   jal write_file_header
 
+  lw $a0, output
+  jal write_image_header
+
 exit:
   li $v0, 10
   syscall
@@ -199,6 +202,49 @@ write_file_header:
   syscall
 
   tnei $v0, 14 # Trap in case of error
+
+  jr $ra
+
+# $a0: file descriptor
+write_image_header:
+  la $a1, buffer
+  li $a2, 40
+
+  # Total header size
+  sw $a2, 0($a1)
+
+  # Image size
+  li $t0, 512
+  sw $t0, 4($a1)
+  sw $t0, 8($a1)
+
+  # Image planes
+  li $t0, 1
+  sh $t0, 12($a1)
+
+  # Image bit count
+  li $t0, 24
+  sh $t0, 14($a1)
+
+  # Image compression
+  sw $zero, 16($a1)
+
+  # Image size (2)
+  sw $zero, 20($a1)
+
+  # Image preferred resolution
+  sw $zero, 24($a1)
+  sw $zero, 28($a1)
+
+  # Image colors
+  sw $zero, 32($a1)
+  sw $zero, 36($a1)
+
+  # Write image header
+  li $v0, 15
+  syscall
+
+  tnei $v0, 40 # Trap in case of error
 
   jr $ra
 
