@@ -38,6 +38,8 @@ paint_line:
   li $v0, 14
   syscall
 
+  bne $v0, $a2, invalid_file # Make sure a full line was read
+
   la $t8, buffer             # Start of loaded file content
   la $t9, buffer + 1536      # End of loaded file content
 
