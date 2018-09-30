@@ -78,6 +78,40 @@ paint_pixel:
   lw $a0, output
   jal write_image_header
 
+  la $s0, screen             # s0 is the start of the screen
+  move $t8, $s0
+  li $s1, 512                # How many lines are left?
+
+write:
+  li $s2, 512                # How many pixels are left in this line?
+
+write_line:
+  lw $t0, 0($s0)
+
+  sb $t0, 0($t8)            # Write blue component
+  srl $t0, $t0, 8
+  sb $t0, 1($t8)            # Write green component
+  srl $t0, $t0, 8
+  sb $t0, 2($t8)            # Write red component
+
+  addi $s0, $s0, 4
+  addi $t8, $t8, 3
+  addi $s2, $s2, -1
+  bnez $s2, write_line
+
+  addi $s1, $s1, -1
+  bnez $s1, write
+
+  lw $a0, output
+  la $a1, screen
+  li $a2, 786432
+  li $v0, 15
+  syscall
+
+# --------------------------------------------------------------------------- #
+#                                  Functions                                  #
+# --------------------------------------------------------------------------- #
+
 exit:
   li $v0, 10
   syscall
