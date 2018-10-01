@@ -74,8 +74,9 @@ paint_pixel:
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
 
-  #j blur_effect
+  j blur_effect
 
+continue:
   # Request output path from the user
   la $a0, output_msg
   la $a1, output
@@ -205,7 +206,7 @@ remove_char:
   sb $zero, -2($a0)
   jr $ra
 
-#Here we apply the blur effect over the input image.    
+#Here we apply the blur effect over the input image.
 blur_effect:
 
   move $s0, $zero		# $s0 has the kernel value.
@@ -217,121 +218,121 @@ blur_effect:
   li $t1, 0			# $t1 will be our counter for the kernel pixel line.
   move $t3, $s2			# Address to retrieved pixel.
   li $t9, 0			# $t9 will hold the number of processed elements of the kernel.
-  
-  la $t5, kernel_size		 
+
+  la $t5, kernel_size
   la $t6, kernel_columns
   lw $t5, 0($t5)
   lw $t6, 0($t6)
-  
+
   move $a0, $t5			# Number of kernel's elements.
   move $a1, $t6			# Number of kernel's columns.
-  
+
   jal distribution_column_value
-  
+
   move $t5, $v0
-  
+
   la $t6, kernel_distribution_number
   sw $t5, 0($t6)
-  
+
   move $a0, $t5			# Number of proportional columns to the right or lefft of the center of the convolution matrix.
-  
+
   la $t6, kernel_line_number
   sw $t5, 0($t6)
-  
+
   move $a1, $t5			# First line number is the number of lines of the convolution matrix.
-  
+
   jal first_kernel_element_address_offset
-  
+
   move $t8, $v0
   la $t5, kernel_columns
   lw $t7, 0($t5)
-  
-  move $t2, $zero	# $t2 will be used to accumulate the kernel value. 
+
+  move $t2, $zero	# $t2 will be used to accumulate the kernel value.
   move $s5, $zero	# $s5 will keep the sum's result of red component.
   move $s6, $zero	# $s6 will keep the sum's result of green component.
-  move $s7, $zero	# $s7 will keep the sum's result of blue component.  
-        
+  move $s7, $zero	# $s7 will keep the sum's result of blue component.
+
   pixel_processing:
-  
+
     beq $t1, $t7, end_line
-    
+
     add $t4, $t3, $t8	# $t4 is the matching pixel to the convolution matrix.
     addi $t8, $t8, 4	# Increment to define the next pixel address offset.
     addi $t1, $t1, 1	# Increment on the kernel's pixel line counter.
     addi $t9, $t9, 1	# Increment on the number of kernel elements processed.
-    		
+
     blt $t4, $s2, pixel_processing	# Ignores pixel with address lower than the beginning of the image.
     bgt $t4, $s3, pixel_processing	# Ignores pixel with address higher than the end of the image.
-    
+
     la $t6, kernel_line_number
     lw $t5, 0($t6)
-    
+
     move $a0, $t0
     move $a1, $t5
-   
+
     jal first_element_line_offset
-    
+
     add $t6, $t3, $v0
-                
+
     blt $t4, $t6, pixel_processing
-    
+
     addi $t6, $t6, 2048
-    
+
     bgt $t4, $t6, pixel_processing
-    
-    move $t5, $t4		# $t5 holds the address of the pixel.    
-                
+
+    move $t5, $t4		# $t5 holds the address of the pixel.
+
     lbu $t6, 2($t5)		# $t6 holds the component value.
     sll $t4, $t9, 2
     sub $t4, $t4, 4
     add $t4, $t4, $s1
     lw $t4, 0($t4)		# Now $t4 holds the kernel element value.
-    
-    mul $t6, $t6, $t4		# Multiplication of kernel value by the pixel red component value. 
+
+    mul $t6, $t6, $t4		# Multiplication of kernel value by the pixel red component value.
     add $s5, $s5, $t6
 
-    lbu $t6, 1($t5)		
+    lbu $t6, 1($t5)
     mul $t6, $t6, $t4		# Multiplication of kernel value by the pixel gree component value.
     add $s6, $s6,$t6
 
-    lbu $t6, 0($t5)  		 
+    lbu $t6, 0($t5)
     mul $t6, $t6, $t4		# Multiplication of kernel value by the pixel blue component value.
     add $s7, $s7, $t6
-    
+
     add $t2, $t2, $t4		# Sums the kernel element value to compose the total of the valid kernel.
-    
+
     j pixel_processing
-    
+
     end_line:
-    
+
       la $t6, kernel_size	# Checks if all elements of kernel were processed.
       lw $t5, 0($t6)
       move $a0, $t5
       beq $t9, $t5, end_load
-      
+
       li $t1, 0					# $t1 will be our counter for the kernel pixel line.
       la $t6, kernel_line_number
       lw $t5, 0($t6)
       addi $t5, $t5, -1
       sw $t5, 0($t6)
       move $a1, $t5
-      
+
       la $t6, kernel_distribution_number
       lw $t5, 0($t6)
       move $a0, $t5
-      
+
       jal first_kernel_element_address_offset
-      
+
       move $t8, $v0
-                        
-      j pixel_processing      
-      
+
+      j pixel_processing
+
     end_load:
-    
+
     divu $s5, $s5, $t2
     divu $s6, $s6, $t2
     div $s7, $s7, $t2
-    
+
     move $t5, $s5
 
     sll $t5, $t5, 16           # Prepare component to be joined; red   <<= 16
@@ -339,38 +340,38 @@ blur_effect:
 
     or $t5, $t5, $s6           # t0 contains red and green components
     or $t5, $t5, $s7           # t0 contains all rgb components
-    
-    sw $t5, 0($s4)			# Stores the new pixel on the new_image address.	
-    
+
+    sw $t5, 0($s4)			# Stores the new pixel on the new_image address.
+
     addi $s4, $s4, 4			# Increment on the new_image address to point to the next pixel.
     addi $t3, $t3, 4			# Increment on the image next pixel.
     addi $t0, $t0, 1			# Increment on the pixel line counter.
     la $t5, kernel_columns		# Retrieves the number of columns of the kernel.
     lw $t7, 0($t5)			# Resets the limit of elements in one line f the kernel.
-    
+
     la $t6, kernel_distribution_number	# Retieves the kernel distribution number address.
     lw $t5, 0($t6)			# Retieves the kernel distribution number value.
     move $a0, $t5			# Sets the distribution number.
-    
+
     la $t6, kernel_line_number		# Gets the address of the kernel line number.
     sw $t5, 0($t6)			# Resets the kernel line number.
- 
+
     move $a1, $t5			# Sets the number of the line.
-  
+
     jal first_kernel_element_address_offset
-    
+
     move $t8, $v0
-    
+
     move $t2, $zero	# $t2 will be used to accumulate the kernel value.
     move $s5, $zero	# $s5 will keep the sum's result of red component.
     move $s6, $zero	# $s6 will keep the sum's result of green component.
     move $s7, $zero	# $s7 will keep the sum's result of blue component.
     move $t9, $zero
     move $t1, $zero
-      
+
     bgt $t3, $s3, print_blured_image
     blt $t0, 513, pixel_processing
-    
+
     li $t0, 1
     j pixel_processing
 
@@ -379,62 +380,62 @@ print_blured_image:
   la $s0, new_image
   la $s1, screen
   addi $s2, $s1 1048576
-    
+
   transfer:
-  
-    beq $s2, $s1, exit
-  
+
+    beq $s2, $s1, continue
+
     lw $t1, 0($s0)
     sw $t1, 0($s1)
-    
+
     addi $s0, $s0, 4
     addi $s1, $s1, 4
-    
+
     j transfer
-    
-# Retrieves the address to the first element o of the image corresponding to the convolution matrix.          
+
+# Retrieves the address to the first element o of the image corresponding to the convolution matrix.
 first_kernel_element_address_offset:
 
   move $t5, $a0		# Proportional value of columns to the left or right.
   move $t6, $a1		# Kernel's line number.
-  
+
   mul $t6, $t6, -2048
   mul $t5, $t5, 4
-  
+
   sub $v0, $t6, $t5
-  
+
   jr $ra
-  
+
 first_element_line_offset:
 
   move $t5, $a0		# Pixel line counter.
   move $t6, $a1		# Kernel's line number.
-  
+
   mul $t6, $t6, -2048
   sub $t5, $t5, 1
   mul $t5, $t5, 4
-  
+
   sub $v0, $t6, $t5
-  
+
   jr $ra
-  
-#Retieves the value used to define how many columns are to the left or to the right.    
+
+#Retieves the value used to define how many columns are to the left or to the right.
 distribution_column_value:
 
   move $t5, $a0		# Number of elements of the kernel.
   move $t6, $a1		# Number of columns in the kernel.
-  
+
   div $t5, $t5, 2
   add $t5, $t5, 1
-  
+
   subtraction_loop:
-  
+
     sub $t5, $t5, $t6
     bltz $t5, end_subtraction_loop
     j subtraction_loop
-  
+
   end_subtraction_loop:
-  
+
   mul $v0, $t5, -1
-  
+
   jr $ra
