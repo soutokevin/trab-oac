@@ -18,6 +18,8 @@
   kernel_lines: .word 3			# Number of lines of kernel's matrix.
   kernel_line_number: .word 0		# Holds the number of kernel's line being processed.
   kernel_distribution_number: .word 0	# Number that defines the range of elements around the kernel's center.
+  grey_scale_image: .space 1048576	# Space reserved to the grey scale version of the loaded image.
+  
 
 .text
 
@@ -39,6 +41,9 @@ main:
 paint:
   la $s0, screen + 1048576   # s0 is the end of the screen
   li $s1, 512                # s1 will count how many lines are left to paint
+  
+  la $s3, grey_scale_image   # $s3 holds the address to where the gray scale image will be stored.
+  addi $s3, $s3, 1048576
 
 paint_line:
   # Load 1536 bytes (a full line) of pixel data into the buffer
@@ -54,11 +59,17 @@ paint_line:
   la $t9, buffer + 1536      # End of loaded file content
 
   addi $s0, $s0, -2048
+  addi $s3, $s3, -2048
 
 paint_pixel:
   lbu $t0, 2($t8)            # Load red component
   lbu $t1, 1($t8)            # Load green component
   lbu $t2, 0($t8)            # Load blue component
+  
+  add $t3, $t0, $t1	     # Sums the red and green components.
+  add $t3, $t3, $t2	     # Sums the blue component to the other two.
+  div $t3, $t3, 3	     # Gets the average value of the pixel.
+ 
 
   sll $t0, $t0, 16           # Prepare component to be joined; red   <<= 16
   sll $t1, $t1, 8            # Prepare component to be joined; green <<=  8
@@ -67,16 +78,32 @@ paint_pixel:
   or $t0, $t0, $t2           # t0 contains all rgb components
 
   sw $t0, 0($s0)             # Paint pixel
+  
+  move $t0, $t3
+  sll $t3, $t3, 16
+  or $t3, $t3, $t0
+  sll $t0, $t0, 8
+  or $t3, $t3,$t0 
+  
+  sw $t3, 0($s3)	     # Stores the average pixel on the grey image reserved space.			
+
 
   addi $s0, $s0, 4           # Update screen address
+  addi $s3, $s3, 4	     # Updates the grey_scale_image pixel address.
   addi $t8, $t8, 3           # Update file address
+  add $t3, $zero, $zero
   blt $t8, $t9, paint_pixel  # Are we done with this line?
 
   addi $s0, $s0, -2048
+  addi $s3, $s3, -2048
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
+  
+  jal print_grey_scale_image
+  
+  j exit
 
-  j blur_effect
+  #j blur_effect
 
 # --------------------------------------------------------------------------- #
 #                                 Output file                                 #
@@ -126,7 +153,7 @@ write:
 
   addi $s1, $s1, -1          # Decrement line counter
   bnez $s1, write            # Are we done?
-
+  
 # --------------------------------------------------------------------------- #
 #                                  Functions                                  #
 # --------------------------------------------------------------------------- #
@@ -494,14 +521,15 @@ blur_effect:
     move $t1, $zero
 
     bgt $t3, $s3, print_blured_image
+    bgt $t3, $s3, exit
     blt $t0, 513, pixel_processing
 
     li $t0, 1
     j pixel_processing
 
-print_blured_image:
+print_image:
 
-  la $s0, new_image
+  move $s0, $a0
   la $s1, screen
   addi $s2, $s1 1048576
 
@@ -516,6 +544,8 @@ print_blured_image:
     addi $s1, $s1, 4
 
     j transfer
+    
+    jr $ra
 
 # Retrieves the address to the first element o of the image corresponding to the convolution matrix.
 first_kernel_element_address_offset:
@@ -562,4 +592,30 @@ distribution_column_value:
 
   mul $v0, $t5, -1
 
+  jr $ra
+  
+print_blured_image:
+
+  la $a0, new_image
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+  
+  jal print_image
+  
+  lw $ra, 0($sp)
+  add $sp, $sp, 4
+  
+  jr $ra
+  
+print_grey_scale_image:
+
+  la $a0, grey_scale_image
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+  
+  jal print_image
+  
+  lw $ra, 0($sp)
+  add $sp, $sp, 4
+  
   jr $ra
