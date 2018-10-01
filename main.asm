@@ -48,6 +48,8 @@ paint_line:
   li $v0, 14
   syscall
 
+  bne $v0, $a2, invalid_file # Make sure a full line was read
+
   la $t8, buffer             # Start of loaded file content
   la $t9, buffer + 1536      # End of loaded file content
 
@@ -76,12 +78,58 @@ paint_pixel:
 
   j blur_effect
 
+# --------------------------------------------------------------------------- #
+#                                 Output file                                 #
+# --------------------------------------------------------------------------- #
 continue:
+
   # Request output path from the user
   la $a0, output_msg
   la $a1, output
   li $a2, 1
   jal open_file
+
+  lw $a0, output
+  jal write_file_header
+
+  lw $a0, output
+  jal write_image_header
+
+  la $s0, screen + 1046528   # s0 is the start of the last line of the screen
+  li $s1, 512                # How many lines are left?
+  li $s2, 512                # How many pixels are left in the current line?
+  li $a2, 1536               # The size of each line when written in the file
+
+  lw $a0, output             # Load file decriptor
+  la $a1, buffer             # Load buffer address
+
+write:
+  lw $t0, 0($s0)             # Get color value
+
+  sb $t0, 0($a1)             # Write blue component
+  srl $t0, $t0, 8            # Prepare green component
+  sb $t0, 1($a1)             # Write green component
+  srl $t0, $t0, 8            # Prepare red component
+  sb $t0, 2($a1)             # Write red component
+
+  addi $s0, $s0, 4           # Update pointer to the screen
+  addi $a1, $a1, 3           # Update pointer to output buffer
+  addi $s2, $s2, -1          # Decrement counter of pixels written
+  bnez $s2, write            # Are we done with this line?
+
+  li $s2, 512                # Reset pixels counter
+  la $a1, buffer             # Reset buffer pointer
+  addi $s0, $s0, -4096       # Update pointer to the start of the previous line
+
+  li $v0, 15                 # Write file syscall code
+  syscall
+
+  addi $s1, $s1, -1          # Decrement line counter
+  bnez $s1, write            # Are we done?
+
+# --------------------------------------------------------------------------- #
+#                                  Functions                                  #
+# --------------------------------------------------------------------------- #
 
 exit:
   li $v0, 10
@@ -176,6 +224,82 @@ discard_header:
   # Discard the rest of the header
   li $v0, 14
   syscall
+
+  jr $ra
+
+# $a0: file descriptor
+write_file_header:
+  la $a1, buffer
+
+  # The first byte is a letter 'B'
+  li $t0, 'B'
+  sb $t0, 0($a1)
+
+  # The second byte is a letter 'M'
+  li $t0, 'M'
+  sb $t0, 1($a1)
+
+  # Total file size
+  li $t0, 786486
+  usw $t0, 2($a1)
+
+  # Reserved bytes (must be zero)
+  sh $zero, 6($a1)
+  sh $zero, 8($a1)
+
+  # Offset
+  li $t0, 54
+  usw $t0, 10($a1)
+
+  # Write file header
+  li $a2, 14
+  li $v0, 15
+  syscall
+
+  tnei $v0, 14 # Trap in case of error
+
+  jr $ra
+
+# $a0: file descriptor
+write_image_header:
+  la $a1, buffer
+  li $a2, 40
+
+  # Total header size
+  sw $a2, 0($a1)
+
+  # Image size
+  li $t0, 512
+  sw $t0, 4($a1)
+  sw $t0, 8($a1)
+
+  # Image planes
+  li $t0, 1
+  sh $t0, 12($a1)
+
+  # Image bit count
+  li $t0, 24
+  sh $t0, 14($a1)
+
+  # Image compression
+  sw $zero, 16($a1)
+
+  # Image size (2)
+  sw $zero, 20($a1)
+
+  # Image preferred resolution
+  sw $zero, 24($a1)
+  sw $zero, 28($a1)
+
+  # Image colors
+  sw $zero, 32($a1)
+  sw $zero, 36($a1)
+
+  # Write image header
+  li $v0, 15
+  syscall
+
+  tnei $v0, 40 # Trap in case of error
 
   jr $ra
 
