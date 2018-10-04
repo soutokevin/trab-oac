@@ -8,9 +8,8 @@
   input: .word 0
   output: .word 0
   buffer: .space 1536
-  new_image: .space 1048576
-  kernel: .word 1,2,1,2,4,2,1,2,1
-  #kernel: .word 1,1,1,1,1,1,1,1,1
+  #kernel: .word 1,2,1,2,4,2,1,2,1
+  kernel: .word 1,1,1,1,1,1,1,1,1
   #kernel: .word 0,0,0,0,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0,0
   #kernel: .word 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
   kernel_size: .word 9			# Total number of elements of the kernel (nXm).
@@ -18,9 +17,14 @@
   kernel_lines: .word 3			# Number of lines of kernel's matrix.
   kernel_line_number: .word 0		# Holds the number of kernel's line being processed.
   kernel_distribution_number: .word 0	# Number that defines the range of elements around the kernel's center.
+  kernel_gx: .word -1,0,1,-2,0,2,-1,0,1
+  kernel_gy: .word 1,2,1,0,0,0,-1,-2,-1
+  blured_image: .space 1048576
   grey_scale_image: .space 1048576	# Space reserved to the grey scale version of the loaded image.
+  vertical_edge_image: .space 1048576
+  horizontal_edge_image: .space 1048576
   
-
+    
 .text
 
 main:
@@ -99,11 +103,9 @@ paint_pixel:
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
   
-  jal print_grey_scale_image
-  
+  jal edge_detection
+    
   j exit
-
-  #j blur_effect
 
 # --------------------------------------------------------------------------- #
 #                                 Output file                                 #
@@ -360,11 +362,13 @@ remove_char:
 #Here we apply the blur effect over the input image.
 blur_effect:
 
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
   move $s0, $zero		# $s0 has the kernel value.
   la $s1, kernel		# $s1 will keep the kernel address.
-  la $s2, screen		# $s2 will keep the initial adress of the original image.
+  move $s2, $a0			# $s2 will keep the initial adress of the original image.
   addi $s3, $s2, 1048576	# $s3 will keep the final address of the original image.
-  la $s4, new_image		# $s4 has the new image's address.
+  la $s4, blured_image		# $s4 has the new image's address.
   li $t0, 1			# $t0 will perform as a pixel line counter (1 - 512).
   li $t1, 0			# $t1 will be our counter for the kernel pixel line.
   move $t3, $s2			# Address to retrieved pixel.
@@ -520,12 +524,50 @@ blur_effect:
     move $t9, $zero
     move $t1, $zero
 
-    bgt $t3, $s3, print_blured_image
-    bgt $t3, $s3, exit
+    bgt $t3, $s3, end_blur
     blt $t0, 513, pixel_processing
 
     li $t0, 1
     j pixel_processing
+    
+    end_blur:
+  
+      lw $ra, 0($sp)
+      add $sp, $sp, 4
+      jr $ra
+    
+edge_detection:
+
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+    
+  # Apply blur effect on grey scale image.
+  
+  la $a0, grey_scale_image  
+  jal blur_effect
+    
+  la $a0, blured_image
+  jal print_image
+  
+  # Build new image G(x). Vertical edges.
+  
+  la $a0, blured_image 
+  la $a1, kernel_gx
+  la $a2, screen
+  la $a3, kernel_gy
+  
+  jal edge_convolution
+  
+  #la $a0, vertical_edge_image
+  
+  #jal print_image
+  
+  j exit
+  
+  # Build new image G(y). Horizontal edges.
+  
+  # Compute the magnetude of the gradient and stores on the new image allocated space.
+  
 
 print_image:
 
@@ -535,7 +577,7 @@ print_image:
 
   transfer:
 
-    beq $s2, $s1, continue
+    beq $s2, $s1, end_transfer #continue
 
     lw $t1, 0($s0)
     sw $t1, 0($s1)
@@ -545,7 +587,9 @@ print_image:
 
     j transfer
     
-    jr $ra
+    end_transfer:
+    
+      jr $ra
 
 # Retrieves the address to the first element o of the image corresponding to the convolution matrix.
 first_kernel_element_address_offset:
@@ -596,7 +640,7 @@ distribution_column_value:
   
 print_blured_image:
 
-  la $a0, new_image
+  la $a0, blured_image
   sub $sp, $sp, 4
   sw $ra, 0($sp)
   
@@ -619,3 +663,182 @@ print_grey_scale_image:
   add $sp, $sp, 4
   
   jr $ra
+  
+edge_convolution:
+
+  sub $sp, $sp, 4		# Opens an space for one element on the stack.
+  sw $ra, 0($sp)		# Stores the return address on the stack.
+        
+  move $s0, $a1			# $s0 will keep the G(x) kernel's address.
+  move $s1, $a0			# $s1 will keep the initial adress of the image being analyzed.
+  addi $s2, $s1, 1048576	# $s2 will keep the final address of the original image.
+  move $s3, $a2			# $s3 has the initial address of the output image.
+  move $s4, $zero		# $s4 will keep the result of the vertical convolution.
+  move $s5, $a3     		# $s5 will keep the G(y) kernel's address.
+  move $s6, $zero		# $s6 will store the result of the horizontal convolution.
+    
+  li $t0, 1			# $t0 will perform as a pixel line counter (1 - 512). Tells wich pixel we're analyzing on the line.
+  li $t1, 0			# $t1 will be our counter for the kernel pixel line. Tells wich element of the kernel line is being used.
+  move $t3, $s1			# Address to retrieved pixel. That's the address of the ppixel being analyzed.
+  li $t9, 0			# $t9 will hold the number of processed elements of the kernel.
+
+  la $t5, kernel_size
+  la $t6, kernel_columns
+  lw $t5, 0($t5)
+  lw $t6, 0($t6)
+
+  move $a0, $t5			# Number of kernel's elements.
+  move $a1, $t6			# Number of kernel's columns.
+
+  jal distribution_column_value
+
+  move $t5, $v0
+
+  la $t6, kernel_distribution_number
+  sw $t5, 0($t6)
+
+  move $a0, $t5			# Number of proportional columns to the right or lefft of the center of the convolution matrix.
+
+  la $t6, kernel_line_number
+  sw $t5, 0($t6)
+
+  move $a1, $t5			# First line number is the number of lines of the convolution matrix.
+
+  jal first_kernel_element_address_offset
+
+  move $t8, $v0
+  la $t5, kernel_columns
+  lw $t7, 0($t5)  
+  
+  j end_pixel_convolution
+
+  pixel_convolution:
+
+    beq $t1, $t7, end_kernel_line
+
+    add $t4, $t3, $t8	# $t4 is the matching pixel to the convolution matrix.
+    addi $t8, $t8, 4	# Increment to define the next pixel address offset.
+    addi $t1, $t1, 1	# Increment on the kernel's pixel line counter.
+    addi $t9, $t9, 1	# Increment on the number of kernel elements processed.
+
+    blt $t4, $s1, pixel_convolution	# Ignores pixel with address lower than the beginning of the image.
+    bgt $t4, $s2, pixel_convolution	# Ignores pixel with address higher than the end of the image.
+
+    la $t6, kernel_line_number
+    lw $t5, 0($t6)
+
+    move $a0, $t0
+    move $a1, $t5
+
+    jal first_element_line_offset
+
+    add $t6, $t3, $v0
+
+    blt $t4, $t6, pixel_convolution
+
+    addi $t6, $t6, 2048
+
+    bgt $t4, $t6, pixel_convolution
+
+    move $t5, $t4		# $t5 holds the address of the pixel.
+
+    lbu $t6, 0($t5)		# $t6 holds the component value.
+    
+    sll $t4, $t9, 2
+    sub $t4, $t4, 4
+    add $t4, $t4, $s0
+    lw $t4, 0($t4)		# Now $t4 holds the vertical kernel element value.
+
+    mul $t6, $t6, $t4		# Multiplication of kernel value by the pixel red component value.
+    add $s4, $s4, $t6
+    
+    sll $t4, $t9, 2
+    sub $t4, $t4, 4
+    add $t4, $t4, $s5
+    lw $t4, 0($t4)		# Now $t4 holds the vertical kernel element value.
+
+    mul $t6, $t6, $t4		# Multiplication of kernel value by the pixel red component value.
+    add $s6, $s6, $t6
+
+    j pixel_convolution
+
+    end_kernel_line:
+
+      la $t6, kernel_size	# Checks if all elements of kernel were processed.
+      lw $t5, 0($t6)
+      move $a0, $t5
+      beq $t9, $t5, end_pixel_convolution
+
+      li $t1, 0					# $t1 will be our counter for the kernel pixel line.
+      la $t6, kernel_line_number
+      lw $t5, 0($t6)
+      addi $t5, $t5, -1
+      sw $t5, 0($t6)
+      move $a1, $t5
+
+      la $t6, kernel_distribution_number
+      lw $t5, 0($t6)
+      move $a0, $t5
+
+      jal first_kernel_element_address_offset
+
+      move $t8, $v0
+
+      j pixel_convolution
+
+    end_pixel_convolution:
+    
+    abs $s4, $s4
+    abs $s6, $s6
+ 
+    add $s4, $s4, $s6
+    
+    andi $s4, $s4, 255
+
+    move $t5, $s4			# Moves the result of the convolution on the pixel to $t5.
+
+    sll $t5, $t5, 16           		# Fills the red component with $t5 value.
+    or $t5, $t5, $s4           		# Fills the blue component with $t5 value.
+    sll $s4, $s4, 8            		# Prepares the green component to be allocated on the pixel word.
+    or $t5, $t5, $s4           		# Fills the green component with $t5 value.
+
+    sw $t5, 0($s3)			# Stores the new pixel value on the output image address.
+
+    addi $s3, $s3, 4			# Increment on the output image address to point to the next pixel.
+    addi $t3, $t3, 4			# Increment on the image next pixel.
+    addi $t0, $t0, 1			# Increment on the pixel line counter.
+    la $t5, kernel_columns		# Retrieves the number of columns of the kernel.
+    lw $t7, 0($t5)			# Resets the limit of elements in one line of the kernel.
+
+    la $t6, kernel_distribution_number	# Retieves the kernel distribution number address.
+    lw $t5, 0($t6)			# Retieves the kernel distribution number value.
+    move $a0, $t5			# Sets the distribution number to $a0.
+
+    la $t6, kernel_line_number		# Gets the address of the kernel line number.
+    sw $t5, 0($t6)			# Resets the kernel line number with the distribution value.
+
+    move $a1, $t5			# Sets the number of the line.
+
+    jal first_kernel_element_address_offset
+
+    move $t8, $v0
+
+    move $s4, $zero	# Resets the x gradient value.
+    move $s6, $zero	# Resets the y gradient value.
+    move $t9, $zero	# Resets the value that idicates wich kernel element is being analyzed.
+    move $t1, $zero	# Resets the counter for the element of the kernel line.
+    
+    beq $t0, 512, end_pixel_convolution
+    bgt $t3, $s2, end_edge_convolution
+    blt $t0, 513, pixel_convolution
+
+    li $t0, 1
+    beq $t0, 1, end_pixel_convolution
+    j pixel_convolution
+    
+    end_edge_convolution:
+  
+      lw $ra, 0($sp)
+      add $sp, $sp, 4
+      jr $ra
+
