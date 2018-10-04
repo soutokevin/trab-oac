@@ -23,8 +23,8 @@
   grey_scale_image: .space 1048576	# Space reserved to the grey scale version of the loaded image.
   vertical_edge_image: .space 1048576
   horizontal_edge_image: .space 1048576
-  
-    
+
+
 .text
 
 main:
@@ -45,7 +45,7 @@ main:
 paint:
   la $s0, screen + 1048576   # s0 is the end of the screen
   li $s1, 512                # s1 will count how many lines are left to paint
-  
+
   la $s3, grey_scale_image   # $s3 holds the address to where the gray scale image will be stored.
   addi $s3, $s3, 1048576
 
@@ -69,11 +69,11 @@ paint_pixel:
   lbu $t0, 2($t8)            # Load red component
   lbu $t1, 1($t8)            # Load green component
   lbu $t2, 0($t8)            # Load blue component
-  
+
   add $t3, $t0, $t1	     # Sums the red and green components.
   add $t3, $t3, $t2	     # Sums the blue component to the other two.
   div $t3, $t3, 3	     # Gets the average value of the pixel.
- 
+
 
   sll $t0, $t0, 16           # Prepare component to be joined; red   <<= 16
   sll $t1, $t1, 8            # Prepare component to be joined; green <<=  8
@@ -82,14 +82,14 @@ paint_pixel:
   or $t0, $t0, $t2           # t0 contains all rgb components
 
   sw $t0, 0($s0)             # Paint pixel
-  
+
   move $t0, $t3
   sll $t3, $t3, 16
   or $t3, $t3, $t0
   sll $t0, $t0, 8
-  or $t3, $t3,$t0 
-  
-  sw $t3, 0($s3)	     # Stores the average pixel on the grey image reserved space.			
+  or $t3, $t3,$t0
+
+  sw $t3, 0($s3)	     # Stores the average pixel on the grey image reserved space.
 
 
   addi $s0, $s0, 4           # Update screen address
@@ -102,9 +102,9 @@ paint_pixel:
   addi $s3, $s3, -2048
   addi $s1, $s1, -1          # Finished painting one line, decrement s1
   bnez $s1, paint_line       # Are we done yet?
-  
+
   jal edge_detection
-    
+
   j exit
 
 # --------------------------------------------------------------------------- #
@@ -155,7 +155,7 @@ write:
 
   addi $s1, $s1, -1          # Decrement line counter
   bnez $s1, write            # Are we done?
-  
+
 # --------------------------------------------------------------------------- #
 #                                  Functions                                  #
 # --------------------------------------------------------------------------- #
@@ -529,45 +529,45 @@ blur_effect:
 
     li $t0, 1
     j pixel_processing
-    
+
     end_blur:
-  
+
       lw $ra, 0($sp)
       add $sp, $sp, 4
       jr $ra
-    
+
 edge_detection:
 
   sub $sp, $sp, 4
   sw $ra, 0($sp)
-    
+
   # Apply blur effect on grey scale image.
-  
-  la $a0, grey_scale_image  
+
+  la $a0, grey_scale_image
   jal blur_effect
-    
+
   la $a0, blured_image
   jal print_image
-  
+
   # Build new image G(x). Vertical edges.
-  
-  la $a0, blured_image 
+
+  la $a0, blured_image
   la $a1, kernel_gx
   la $a2, screen
   la $a3, kernel_gy
-  
+
   jal edge_convolution
-  
+
   #la $a0, vertical_edge_image
-  
+
   #jal print_image
-  
+
   j exit
-  
+
   # Build new image G(y). Horizontal edges.
-  
+
   # Compute the magnetude of the gradient and stores on the new image allocated space.
-  
+
 
 print_image:
 
@@ -586,9 +586,9 @@ print_image:
     addi $s1, $s1, 4
 
     j transfer
-    
+
     end_transfer:
-    
+
       jr $ra
 
 # Retrieves the address to the first element o of the image corresponding to the convolution matrix.
@@ -619,7 +619,6 @@ first_element_line_offset:
 
 #Retieves the value used to define how many columns are to the left or to the right.
 distribution_column_value:
-
   move $t5, $a0		# Number of elements of the kernel.
   move $t6, $a1		# Number of columns in the kernel.
 
@@ -627,48 +626,44 @@ distribution_column_value:
   add $t5, $t5, 1
 
   subtraction_loop:
-
     sub $t5, $t5, $t6
-    bltz $t5, end_subtraction_loop
-    j subtraction_loop
-
-  end_subtraction_loop:
+    bgez $t5, subtraction_loop
 
   mul $v0, $t5, -1
 
   jr $ra
-  
+
 print_blured_image:
 
   la $a0, blured_image
   sub $sp, $sp, 4
   sw $ra, 0($sp)
-  
+
   jal print_image
-  
+
   lw $ra, 0($sp)
   add $sp, $sp, 4
-  
+
   jr $ra
-  
+
 print_grey_scale_image:
 
   la $a0, grey_scale_image
   sub $sp, $sp, 4
   sw $ra, 0($sp)
-  
+
   jal print_image
-  
+
   lw $ra, 0($sp)
   add $sp, $sp, 4
-  
+
   jr $ra
-  
+
 edge_convolution:
 
   sub $sp, $sp, 4		# Opens an space for one element on the stack.
   sw $ra, 0($sp)		# Stores the return address on the stack.
-        
+
   move $s0, $a1			# $s0 will keep the G(x) kernel's address.
   move $s1, $a0			# $s1 will keep the initial adress of the image being analyzed.
   addi $s2, $s1, 1048576	# $s2 will keep the final address of the original image.
@@ -676,7 +671,7 @@ edge_convolution:
   move $s4, $zero		# $s4 will keep the result of the vertical convolution.
   move $s5, $a3     		# $s5 will keep the G(y) kernel's address.
   move $s6, $zero		# $s6 will store the result of the horizontal convolution.
-    
+
   li $t0, 1			# $t0 will perform as a pixel line counter (1 - 512). Tells wich pixel we're analyzing on the line.
   li $t1, 0			# $t1 will be our counter for the kernel pixel line. Tells wich element of the kernel line is being used.
   move $t3, $s1			# Address to retrieved pixel. That's the address of the ppixel being analyzed.
@@ -708,8 +703,8 @@ edge_convolution:
 
   move $t8, $v0
   la $t5, kernel_columns
-  lw $t7, 0($t5)  
-  
+  lw $t7, 0($t5)
+
   j end_pixel_convolution
 
   pixel_convolution:
@@ -743,7 +738,7 @@ edge_convolution:
     move $t5, $t4		# $t5 holds the address of the pixel.
 
     lbu $t6, 0($t5)		# $t6 holds the component value.
-    
+
     sll $t4, $t9, 2
     sub $t4, $t4, 4
     add $t4, $t4, $s0
@@ -751,7 +746,7 @@ edge_convolution:
 
     mul $t6, $t6, $t4		# Multiplication of kernel value by the pixel red component value.
     add $s4, $s4, $t6
-    
+
     sll $t4, $t9, 2
     sub $t4, $t4, 4
     add $t4, $t4, $s5
@@ -787,12 +782,12 @@ edge_convolution:
       j pixel_convolution
 
     end_pixel_convolution:
-    
+
     abs $s4, $s4
     abs $s6, $s6
- 
+
     add $s4, $s4, $s6
-    
+
     andi $s4, $s4, 255
 
     move $t5, $s4			# Moves the result of the convolution on the pixel to $t5.
@@ -827,7 +822,7 @@ edge_convolution:
     move $s6, $zero	# Resets the y gradient value.
     move $t9, $zero	# Resets the value that idicates wich kernel element is being analyzed.
     move $t1, $zero	# Resets the counter for the element of the kernel line.
-    
+
     beq $t0, 512, end_pixel_convolution
     bgt $t3, $s2, end_edge_convolution
     blt $t0, 513, pixel_convolution
@@ -835,9 +830,9 @@ edge_convolution:
     li $t0, 1
     beq $t0, 1, end_pixel_convolution
     j pixel_convolution
-    
+
     end_edge_convolution:
-  
+
       lw $ra, 0($sp)
       add $sp, $sp, 4
       jr $ra
