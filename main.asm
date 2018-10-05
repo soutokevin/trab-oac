@@ -599,32 +599,29 @@ first_kernel_element_address_offset:
 
   jr $ra
 
+# a0: Pixel line counter.
+# a1: Kernel's line number.
 first_element_line_offset:
+  mul $a1, $a1, -2048
+  sub $a0, $a0, 1
+  mul $a0, $a0, 4
 
-  move $t5, $a0		# Pixel line counter.
-  move $t6, $a1		# Kernel's line number.
-
-  mul $t6, $t6, -2048
-  sub $t5, $t5, 1
-  mul $t5, $t5, 4
-
-  sub $v0, $t6, $t5
+  sub $v0, $a1, $a0
 
   jr $ra
 
-#Retieves the value used to define how many columns are to the left or to the right.
+# Retieves the value used to define how many columns are to the left or to the right.
+# a0: Number of elements of the kernel.
+# a1: Number of columns in the kernel.
 distribution_column_value:
-  move $t5, $a0		# Number of elements of the kernel.
-  move $t6, $a1		# Number of columns in the kernel.
-
-  div $t5, $t5, 2
-  add $t5, $t5, 1
+  div $a0, $a0, 2
+  add $a0, $a0, 1
 
   subtraction_loop:
-    sub $t5, $t5, $t6
-    bgez $t5, subtraction_loop
+    sub $a0, $a0, $a1
+    bgez $a0, subtraction_loop
 
-  mul $v0, $t5, -1
+  mul $v0, $a0, -1
 
   jr $ra
 
