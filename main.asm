@@ -557,7 +557,7 @@ edge_detection:
   la $a3, kernel_gy
 
   jal edge_convolution
-
+  
   #la $a0, vertical_edge_image
 
   #jal print_image
@@ -671,6 +671,7 @@ edge_convolution:
   move $s4, $zero		# $s4 will keep the result of the vertical convolution.
   move $s5, $a3     		# $s5 will keep the G(y) kernel's address.
   move $s6, $zero		# $s6 will store the result of the horizontal convolution.
+
 
   li $t0, 1			# $t0 will perform as a pixel line counter (1 - 512). Tells wich pixel we're analyzing on the line.
   li $t1, 0			# $t1 will be our counter for the kernel pixel line. Tells wich element of the kernel line is being used.
@@ -832,8 +833,57 @@ edge_convolution:
     j pixel_convolution
 
     end_edge_convolution:
-
+    
       lw $ra, 0($sp)
       add $sp, $sp, 4
       jr $ra
 
+thresholding_effect:
+
+  move $s0, $a0			# User's defined threshold value.
+  move $s1, $a1			# Image's address.
+  move $s2, $a2			# Output's address.
+  addi $s3, $s1, 1048576	# Image's final address.
+  li $s4, 4
+  
+  sub $sp, $sp, $s4
+  sw $ra, 0($sp)
+  
+  threshold:
+  
+    lbu $t0, 0($s1)
+    
+    blt $t0, $s0, low_threshold
+    li $t1, 255
+    j pixel_assembly
+        
+    low_threshold:
+    
+      move $t0, $zero
+      j pixel_writting
+      
+    pixel_assembly:
+    
+      move $t0, $t1
+      sll $t0, $t0, 16
+      or $t0, $t0, $t1
+      sll $t1, $t1, 8
+      or $t0, $t0, $t1
+      
+    pixel_writting:
+    
+      sw $t0, 0($s2)
+      add $s1, $s1, $s4
+      add $s2, $s2, $s4
+      
+      beq $s1, $s3, end_threshold
+      j threshold
+      
+      end_threshold:
+      
+        lw $ra, 0($sp)
+        add $sp, $sp, $s4
+        jr $ra    
+    
+  
+  
