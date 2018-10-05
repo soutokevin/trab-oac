@@ -105,7 +105,7 @@ paint_pixel:
 
   jal edge_detection
 
-  j exit
+  # j exit
 
 # --------------------------------------------------------------------------- #
 #                                 Output file                                 #
@@ -562,7 +562,9 @@ edge_detection:
 
   #jal print_image
 
-  j exit
+  lw $ra, 0($sp)
+  addi $sp, $sp, 4
+  jr $ra
 
   # Build new image G(y). Horizontal edges.
 
@@ -570,26 +572,19 @@ edge_detection:
 
 
 print_image:
-
   move $s0, $a0
   la $s1, screen
-  addi $s2, $s1 1048576
+  addi $s2, $s1, 1048576
 
   transfer:
-
-    beq $s2, $s1, end_transfer #continue
-
     lw $t1, 0($s0)
     sw $t1, 0($s1)
 
     addi $s0, $s0, 4
     addi $s1, $s1, 4
 
-    j transfer
-
-    end_transfer:
-
-      jr $ra
+    bne $s2, $s1, transfer
+    jr $ra
 
 # Retrieves the address to the first element o of the image corresponding to the convolution matrix.
 first_kernel_element_address_offset:
