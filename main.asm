@@ -105,8 +105,6 @@ paint_pixel:
 
   jal edge_detection
 
-  # j exit
-
 # --------------------------------------------------------------------------- #
 #                                 Output file                                 #
 # --------------------------------------------------------------------------- #
@@ -359,7 +357,89 @@ remove_char:
   sb $zero, -2($a0)
   jr $ra
 
-#Here we apply the blur effect over the input image.
+print_image:
+  move $s0, $a0
+  la $s1, screen
+  addi $s2, $s1, 1048576
+
+  transfer:
+    lw $t1, 0($s0)
+    sw $t1, 0($s1)
+
+    addi $s0, $s0, 4
+    addi $s1, $s1, 4
+
+    bne $s2, $s1, transfer
+    jr $ra
+
+# Retrieves the address to the first element o of the image corresponding to the convolution matrix.
+first_kernel_element_address_offset:
+
+  move $t5, $a0		# Proportional value of columns to the left or right.
+  move $t6, $a1		# Kernel's line number.
+
+  mul $t6, $t6, -2048
+  mul $t5, $t5, 4
+
+  sub $v0, $t6, $t5
+
+  jr $ra
+
+# a0: Pixel line counter.
+# a1: Kernel's line number.
+first_element_line_offset:
+  mul $a1, $a1, -2048
+  sub $a0, $a0, 1
+  mul $a0, $a0, 4
+
+  sub $v0, $a1, $a0
+
+  jr $ra
+
+# Retieves the value used to define how many columns are to the left or to the right.
+# a0: Number of elements of the kernel.
+# a1: Number of columns in the kernel.
+distribution_column_value:
+  div $a0, $a0, 2
+  add $a0, $a0, 1
+
+  subtraction_loop:
+    sub $a0, $a0, $a1
+    bgez $a0, subtraction_loop
+
+  mul $v0, $a0, -1
+
+  jr $ra
+
+print_blured_image:
+
+  la $a0, blured_image
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+
+  jal print_image
+
+  lw $ra, 0($sp)
+  add $sp, $sp, 4
+
+  jr $ra
+
+print_grey_scale_image:
+
+  la $a0, grey_scale_image
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+
+  jal print_image
+
+  lw $ra, 0($sp)
+  add $sp, $sp, 4
+
+  jr $ra
+
+# --------------------------------------------------------------------------- #
+#                                 Blur Effect                                 #
+# --------------------------------------------------------------------------- #
 blur_effect:
 
   sub $sp, $sp, 4
@@ -536,6 +616,9 @@ blur_effect:
       add $sp, $sp, 4
       jr $ra
 
+# --------------------------------------------------------------------------- #
+#                               Edge Detection                                #
+# --------------------------------------------------------------------------- #
 edge_detection:
 
   sub $sp, $sp, 4
@@ -569,87 +652,6 @@ edge_detection:
   # Build new image G(y). Horizontal edges.
 
   # Compute the magnetude of the gradient and stores on the new image allocated space.
-
-
-print_image:
-  move $s0, $a0
-  la $s1, screen
-  addi $s2, $s1, 1048576
-
-  transfer:
-    lw $t1, 0($s0)
-    sw $t1, 0($s1)
-
-    addi $s0, $s0, 4
-    addi $s1, $s1, 4
-
-    bne $s2, $s1, transfer
-    jr $ra
-
-# Retrieves the address to the first element o of the image corresponding to the convolution matrix.
-first_kernel_element_address_offset:
-
-  move $t5, $a0		# Proportional value of columns to the left or right.
-  move $t6, $a1		# Kernel's line number.
-
-  mul $t6, $t6, -2048
-  mul $t5, $t5, 4
-
-  sub $v0, $t6, $t5
-
-  jr $ra
-
-# a0: Pixel line counter.
-# a1: Kernel's line number.
-first_element_line_offset:
-  mul $a1, $a1, -2048
-  sub $a0, $a0, 1
-  mul $a0, $a0, 4
-
-  sub $v0, $a1, $a0
-
-  jr $ra
-
-# Retieves the value used to define how many columns are to the left or to the right.
-# a0: Number of elements of the kernel.
-# a1: Number of columns in the kernel.
-distribution_column_value:
-  div $a0, $a0, 2
-  add $a0, $a0, 1
-
-  subtraction_loop:
-    sub $a0, $a0, $a1
-    bgez $a0, subtraction_loop
-
-  mul $v0, $a0, -1
-
-  jr $ra
-
-print_blured_image:
-
-  la $a0, blured_image
-  sub $sp, $sp, 4
-  sw $ra, 0($sp)
-
-  jal print_image
-
-  lw $ra, 0($sp)
-  add $sp, $sp, 4
-
-  jr $ra
-
-print_grey_scale_image:
-
-  la $a0, grey_scale_image
-  sub $sp, $sp, 4
-  sw $ra, 0($sp)
-
-  jal print_image
-
-  lw $ra, 0($sp)
-  add $sp, $sp, 4
-
-  jr $ra
 
 edge_convolution:
 
@@ -830,6 +832,9 @@ edge_convolution:
       add $sp, $sp, 4
       jr $ra
 
+# --------------------------------------------------------------------------- #
+#                                 Thresholding                                #
+# --------------------------------------------------------------------------- #
 thresholding_effect:
 
   move $s0, $a0			# User's defined threshold value.
