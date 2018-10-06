@@ -1,28 +1,46 @@
 .data
-  screen: .space 1048576 # Reserve space for the bitmap display at 512x512
+
+# --------------------------------------------------------------------------- #
+#                                Image's space reservation                    #
+# --------------------------------------------------------------------------- #
+
+  screen: .space 1048576 		# Defines space for the bitmap display at 512x512 starting on static memory address.
+  grey_scale_image: .space 1048576	# Space reserved to the grey scale version of the loaded image.
+  new_image: .space 1048576		# Space the stores the output of image being processed.
+
+# --------------------------------------------------------------------------- #
+#                                 Program mesages                             #
+# --------------------------------------------------------------------------- #
+
   open_error_msg: .asciiz "\nError while opening file\n"
   error_msg: .asciiz "\nInvalid file\n"
   input_msg: .asciiz "Input path: "
   output_msg: .asciiz "Output path: "
+  
+# --------------------------------------------------------------------------- #
+#                                Program variables                            #
+# --------------------------------------------------------------------------- #
+  
   path: .space 500
   input: .word 0
   output: .word 0
   buffer: .space 1536
-  #kernel: .word 1,2,1,2,4,2,1,2,1
-  kernel: .word 1,1,1,1,1,1,1,1,1
-  #kernel: .word 0,0,0,0,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0,0
-  #kernel: .word 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+  
+# --------------------------------------------------------------------------- #
+#                                Kernel variables                             #
+# --------------------------------------------------------------------------- #
+  
   kernel_size: .word 9			# Total number of elements of the kernel (nXm).
   kernel_columns: .word 3		# Number of columns of kernel's matrix.
   kernel_lines: .word 3			# Number of lines of kernel's matrix.
   kernel_line_number: .word 0		# Holds the number of kernel's line being processed.
   kernel_distribution_number: .word 0	# Number that defines the range of elements around the kernel's center.
+  #kernel: .word 1,2,1,2,4,2,1,2,1
+  kernel: .word 1,1,1,1,1,1,1,1,1
+  #kernel: .word 0,0,0,0,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,0,0,0,0
+  #kernel: .word 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
   kernel_gx: .word -1,0,1,-2,0,2,-1,0,1
-  kernel_gy: .word 1,2,1,0,0,0,-1,-2,-1
-  blured_image: .space 1048576
-  grey_scale_image: .space 1048576	# Space reserved to the grey scale version of the loaded image.
-  vertical_edge_image: .space 1048576
-  horizontal_edge_image: .space 1048576
+  kernel_gy: .word 1,2,1,0,0,0,-1,-2,-1  
 
 
 .text
@@ -411,9 +429,9 @@ distribution_column_value:
 
   jr $ra
 
-print_blured_image:
+print_new_image:
 
-  la $a0, blured_image
+  la $a0, new_image
   sub $sp, $sp, 4
   sw $ra, 0($sp)
 
@@ -448,7 +466,7 @@ blur_effect:
   la $s1, kernel		# $s1 will keep the kernel address.
   move $s2, $a0			# $s2 will keep the initial adress of the original image.
   addi $s3, $s2, 1048576	# $s3 will keep the final address of the original image.
-  la $s4, blured_image		# $s4 has the new image's address.
+  la $s4, new_image		# $s4 has the new image's address.
   li $t0, 1			# $t0 will perform as a pixel line counter (1 - 512).
   li $t1, 0			# $t1 will be our counter for the kernel pixel line.
   move $t3, $s2			# Address to retrieved pixel.
@@ -629,12 +647,12 @@ edge_detection:
   la $a0, grey_scale_image
   jal blur_effect
 
-  la $a0, blured_image
+  la $a0, new_image
   jal print_image
 
   # Build new image G(x). Vertical edges.
 
-  la $a0, blured_image
+  la $a0, new_image
   la $a1, kernel_gx
   la $a2, screen
   la $a3, kernel_gy
