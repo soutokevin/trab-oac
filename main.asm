@@ -152,7 +152,7 @@ paint:
 
   jal print_grey_scale_image
 
-  jal continue
+  #jal continue
 
   j exit
 
@@ -220,184 +220,213 @@ continue:
     bnez $s1, write            # Are we done?
 
 # --------------------------------------------------------------------------- #
-#                                  Functions                                  #
+#                         Image maipulation functions                         #
 # --------------------------------------------------------------------------- #
+
+# Fishes the program execution.
 
 exit:
 
   li $v0, 10
   syscall
 
-# a0: Address of a message to present the user
-# a1: Address to store the file descriptor
-# a2: Open mode
+# a0: Address of a message to present to user.
+# a1: Address to store the file descriptor.
+# a2: Open mode.
 
 open_file:
+
   addi $sp, $sp, -12
   sw $ra, 0($sp)
   sw $a1, 4($sp)
   sw $a2, 8($sp)
 
-  # Request path from the user
+  # Requests path from the user.
+
   li $v0, 4
   syscall
 
-  # Get user input
+  # Gets user's input.
+
   la $a0, path
   li $a1, 500
   li $v0, 8
   syscall
 
-  jal remove_char            # Remove ending \n from the input
+  jal remove_char            # Removes ending \n from the input.
 
-  la $a0, path               # Set image path
-  lw $a1, 8($sp)             # Get open mode
-  li $a2, 0                  # ??
-  li $v0, 13                 # Open file syscall code
+  la $a0, path               # Sets image's path.
+  lw $a1, 8($sp)             # Gets open mode.
+  li $a2, 0                  
+  li $v0, 13                 # File's syscall open code.
   syscall
 
-  blt $v0, $zero, open_error # Stop program if failed to open the file
+  blt $v0, $zero, open_error # Stops program if failed to open the file.
 
-  lw $t0, 4($sp)             # Get file descriptor address
-  sw $v0, ($t0)              # Store file descriptor
+  lw $t0, 4($sp)             # Gets file's descriptor address.
+  sw $v0, ($t0)              # Stores file's descriptor.
 
-  # a1 and a2 are not restored
+  # a1 and a2 are not restored.
+
   lw $ra, 0($sp)
   addi $sp, $sp, 12
   jr $ra
 
 # $a0: file descriptor
+
 read_file_header:
-  # Load file header info
+
+  # Loads file's header info.
+
   la $a1, buffer
   li $a2, 14
   li $v0, 14
   syscall
 
-  tnei $v0, 14 # Trap in case of error
+  tnei $v0, 14              # Traps in case of error.
 
-  # The first byte must be a letter 'B'
+  # The first byte must be a letter 'B'.
+
   lbu $t0, 0($a1)
   bne $t0, 'B', invalid_file
 
   # The second byte must be a letter 'M'
+
   lbu $t0, 1($a1)
   bne $t0, 'M', invalid_file
 
   jr $ra
 
 # $a0: file descriptor
+
 read_image_header:
-  # Load image header
+
+  # Loads image's header.
+
   la $a1, buffer
   li $a2, 40
   li $v0, 14
   syscall
 
-  lw $t0, 0($a1)                 # Load actual header size
+  lw $t0, 0($a1)                 # Loads actual header's size.
   addi $a2, $t0, -40             # How many bytes are left to read?
 
-  lw $t0, 4($a1)                 # Load image width
-  bne $t0, 512, invalid_file     # Image width must be 512
+  lw $t0, 4($a1)                 # Loads image's width.
+  bne $t0, 512, invalid_file     # Image's width must be 512.
 
-  lw $t0, 8($a1)                 # Load image height
-  bne $t0, 512, invalid_file     # Image height also must be 512
+  lw $t0, 8($a1)                 # Loads image's height.
+  bne $t0, 512, invalid_file     # Image's height also must be 512.
 
-  lhu $t0, 14($a1)               # Load pixel size in bits
-  bne $t0, 24, invalid_file      # Only 24-bit images are supported
+  lhu $t0, 14($a1)               # Loads pixel's size in bits.
+  bne $t0, 24, invalid_file      # Only 24-bit images are supported.
 
   bne $a2, $zero, discard_header # Do we have any more header data to read?
   jr $ra
 
-# $a0: file descriptor
-# $a1: buffer to be used
-# $a2: bytes left
-discard_header:
-  tgei $t0, 1536                 # Trap if header is too big
+  discard_header:
+  
+    tgei $t0, 1536               # Traps if header is too big.
 
-  # Discard the rest of the header
-  li $v0, 14
-  syscall
+    # Discards the rest of the header.
 
-  jr $ra
+    li $v0, 14
+    syscall
 
-# $a0: file descriptor
+    jr $ra
+
 write_file_header:
+
   la $a1, buffer
 
-  # The first byte is a letter 'B'
+  # The first byte is a letter 'B'.
+
   li $t0, 'B'
   sb $t0, 0($a1)
 
-  # The second byte is a letter 'M'
+  # The second byte is a letter 'M'.
+
   li $t0, 'M'
   sb $t0, 1($a1)
 
-  # Total file size
+  # Total file's size.
+
   li $t0, 786486
   usw $t0, 2($a1)
 
-  # Reserved bytes (must be zero)
+  # Reserved bytes (must be zero).
+
   sh $zero, 6($a1)
   sh $zero, 8($a1)
 
-  # Offset
+  # Offset.
+
   li $t0, 54
   usw $t0, 10($a1)
 
-  # Write file header
+  # Writes file's header.
+
   li $a2, 14
   li $v0, 15
   syscall
 
-  tnei $v0, 14 # Trap in case of error
+  tnei $v0, 14          # Traps in case of error.
 
   jr $ra
 
-# $a0: file descriptor
 write_image_header:
+
   la $a1, buffer
   li $a2, 40
 
-  # Total header size
+  # Total header's size.
+
   sw $a2, 0($a1)
 
-  # Image size
+  # Image's size.
+
   li $t0, 512
   sw $t0, 4($a1)
   sw $t0, 8($a1)
 
-  # Image planes
+  # Image's planes.
+
   li $t0, 1
   sh $t0, 12($a1)
 
-  # Image bit count
+  # Image's bit count.
+
   li $t0, 24
   sh $t0, 14($a1)
 
-  # Image compression
+  # Image's compression.
+
   sw $zero, 16($a1)
 
-  # Image size (2)
+  # Image's size (2).
+
   sw $zero, 20($a1)
 
-  # Image preferred resolution
+  # Image's preferred resolution.
+
   sw $zero, 24($a1)
   sw $zero, 28($a1)
 
-  # Image colors
+  # Image's colors.
+
   sw $zero, 32($a1)
   sw $zero, 36($a1)
 
-  # Write image header
+  # Writes image's header.
+
   li $v0, 15
   syscall
 
-  tnei $v0, 40 # Trap in case of error
+  tnei $v0, 40      # Traps in case of error.
 
   jr $ra
 
 invalid_file:
+
   li $v0, 4
   la $a0, error_msg
   syscall
@@ -407,6 +436,7 @@ invalid_file:
   syscall
 
 open_error:
+
   li $v0, 4
   la $a0, open_error_msg
   syscall
@@ -415,8 +445,10 @@ open_error:
   li $a0, 2
   syscall
 
-# a0: address to a null-terminated string; MUST HAVE LENGTH >= 1
+# a0: address to a null-terminated string (MUST HAVE LENGTH >= 1).
+
 remove_char:
+
   lbu $t0, 0($a0)
   addiu $a0, $a0, 1
   bnez $t0, remove_char
@@ -424,20 +456,59 @@ remove_char:
   sb $zero, -2($a0)
   jr $ra
 
+# Moves an image located on a address to screen's correponding address.
+# $a0 = image's address.
+
 print_image:
+
   move $s0, $a0
   la $s1, screen
-  addi $s2, $s1, 1048576
+  addi $s2, $s1, 1048576      # End of screen's address.
+  li $t0, 4                   # Word's increment.
 
   transfer:
+
     lw $t1, 0($s0)
     sw $t1, 0($s1)
 
-    addi $s0, $s0, 4
-    addi $s1, $s1, 4
+    add $s0, $s0, $t0
+    add $s1, $s1, $t0
 
     bne $s2, $s1, transfer
+
     jr $ra
+
+# Requests the output image to be transfered to the screen.
+    
+print_new_image:
+
+  la $a0, new_image
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+
+  jal print_image
+
+  lw $ra, 0($sp)
+  add $sp, $sp, 4
+
+  jr $ra
+
+# Requests the greyscale image to be transfered to the screen.
+
+print_grey_scale_image:
+
+  la $a0, grey_scale_image
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+
+  jal print_image
+
+  lw $ra, 0($sp)
+  add $sp, $sp, 4
+
+  jr $ra
+
+
 
 # Retrieves the address to the first element o of the image corresponding to the convolution matrix.
 first_kernel_element_address_offset:
@@ -478,31 +549,6 @@ distribution_column_value:
 
   jr $ra
 
-print_new_image:
-
-  la $a0, new_image
-  sub $sp, $sp, 4
-  sw $ra, 0($sp)
-
-  jal print_image
-
-  lw $ra, 0($sp)
-  add $sp, $sp, 4
-
-  jr $ra
-
-print_grey_scale_image:
-
-  la $a0, grey_scale_image
-  sub $sp, $sp, 4
-  sw $ra, 0($sp)
-
-  jal print_image
-
-  lw $ra, 0($sp)
-  add $sp, $sp, 4
-
-  jr $ra
 
 # --------------------------------------------------------------------------- #
 #                                 Blur Effect                                 #
