@@ -16,6 +16,9 @@
   error_msg: .asciiz "\nInvalid file\n"
   input_msg: .asciiz "Input path: "
   output_msg: .asciiz "Output path: "
+  kernel_error_msg: .asciiz "Invalid argument for kernel generation.\n"
+  kernel_line_msg: .asciiz "Please enter an odd positive number for kernel's lines: "
+  kernel_column_msg: .asciiz "Please enter an odd positive number for kernel's columns: "
   
 # --------------------------------------------------------------------------- #
 #                                Program variables                            #
@@ -30,9 +33,10 @@
 #                                Kernel variables                             #
 # --------------------------------------------------------------------------- #
   
-  kernel_size: .word 9			# Total number of elements of the kernel (nXm).
-  kernel_columns: .word 3		# Number of columns of kernel's matrix.
-  kernel_lines: .word 3			# Number of lines of kernel's matrix.
+  kernel_size: .word 0			# Total number of elements of the kernel (nXm).
+  kernel_columns: .word 0		# Number of columns of kernel's matrix.
+  kernel_lines: .word 0			# Number of lines of kernel's matrix.
+
   kernel_line_number: .word 0		# Holds the number of kernel's line being processed.
   kernel_distribution_number: .word 0	# Number that defines the range of elements around the kernel's center.
   #kernel: .word 1,2,1,2,4,2,1,2,1
@@ -43,6 +47,8 @@
   kernel_gy: .word 1,2,1,0,0,0,-1,-2,-1  
 
 .text
+
+j kernel_definition
 
 main:
 
@@ -445,6 +451,18 @@ open_error:
   li $a0, 2
   syscall
 
+# Closes program after an error has occured.
+
+exit_after_error:
+
+  la $a0, kernel_error_msg
+  li $v0, 4
+  syscall
+
+  li $v0, 17
+  li $a0, 2
+  syscall
+
 # a0: address to a null-terminated string (MUST HAVE LENGTH >= 1).
 
 remove_char:
@@ -508,7 +526,9 @@ print_grey_scale_image:
 
   jr $ra
 
-
+# --------------------------------------------------------------------------- #
+#                         Effect's auxiliary functions                        #
+# --------------------------------------------------------------------------- #
 
 # Retrieves the address to the first element o of the image corresponding to the convolution matrix.
 first_kernel_element_address_offset:
@@ -525,7 +545,9 @@ first_kernel_element_address_offset:
 
 # a0: Pixel line counter.
 # a1: Kernel's line number.
+
 first_element_line_offset:
+
   mul $a1, $a1, -2048
   sub $a0, $a0, 1
   mul $a0, $a0, 4
@@ -537,11 +559,14 @@ first_element_line_offset:
 # Retieves the value used to define how many columns are to the left or to the right.
 # a0: Number of elements of the kernel.
 # a1: Number of columns in the kernel.
+
 distribution_column_value:
+
   div $a0, $a0, 2
   add $a0, $a0, 1
 
   subtraction_loop:
+
     sub $a0, $a0, $a1
     bgez $a0, subtraction_loop
 
@@ -549,10 +574,71 @@ distribution_column_value:
 
   jr $ra
 
+kernel_definition:
+
+  sub $sp, $sp, 4
+  sw $ra, 0($sp)
+
+  # Requests number of lines for the kernel.
+
+  la $a0, kernel_line_msg
+  li $v0, 4
+  syscall
+
+  # Gets user's input.
+
+  li $v0, 5
+  syscall
+
+  move $t0, $v0
+  move $a0, $v0
+
+  jal odd_check
+  
+  beqz $v0, exit_after_error
+
+  la $t1, kernel_lines
+  sw $t0, 0($t1)
+
+  # Requests number of lines for the kernel.
+
+  la $a0, kernel_column_msg
+  li $v0, 4
+  syscall
+
+  # Gets user's input.
+
+  li $v0, 5
+  syscall
+
+  move $t0, $v0
+  move $a0, $v0
+
+  jal odd_check
+  
+  beqz $v0, exit_after_error
+
+  la $t1, kernel_columns
+  sw $t0, 0($t1)
+
+  j exit
+
+  jal remove_char            # Removes ending \n from the input.
+
+# Checks if a number is odd.
+
+odd_check:
+
+  li $t0, 2
+  div $a0, $t0
+  mfhi $v0
+
+  jr $ra
 
 # --------------------------------------------------------------------------- #
 #                                 Blur Effect                                 #
 # --------------------------------------------------------------------------- #
+
 blur_effect:
 
   sub $sp, $sp, 4
@@ -950,15 +1036,20 @@ edge_convolution:
 #                                 Thresholding                                #
 # --------------------------------------------------------------------------- #
 
+# Produces an image of blacks and whites based on user's threshold value.
+
 thresholding_effect:
 
   move $s0, $a0			# User's defined threshold value.
   move $s1, $a1			# Image's address.
   move $s2, $a2			# Output's address.
   addi $s3, $s1, 1048576	# Image's final address.
-  li $s4, 4			# Constant defined on register to improve performance.
+  li $s4, 4			    # Constant defined on register to improve performance.
+  li $s5, 255       # Constant with white value.
 
-  sub $sp, $sp, $s4		# Stores the return address on the stack until the end of the procedure.
+  # Stores the return address on the stack until the end of the procedure.
+
+  sub $sp, $sp, $s4		
   sw $ra, 0($sp)
 
   threshold:
@@ -966,7 +1057,7 @@ thresholding_effect:
     lbu $t0, 0($s1)		# Gets the pixel's component value.
 
     blt $t0, $s0, low_threshold	# If the component is less than threshold the new value will be 0.
-    li $t1, 255			# If the component is greater than threshold the new value will be 255.
+    move $t1, $s5			          # If the component is greater than threshold the new value will be 255.
     j pixel_assembly
 
     low_threshold:		# If the new component's value is 0, there is no need to mount the RGB string.
