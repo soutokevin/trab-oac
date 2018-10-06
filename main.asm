@@ -94,7 +94,7 @@ paint:
     bne $v0, $a2, invalid_file # Makes sure a full line was read.
 
     la $t8, buffer             # Start of loaded file content.
-    add $t9, $t8, $s7        # End of loaded file content.
+    add $t9, $t8, $s7          # End of loaded file content.
 
     # The image is written backwards. It starts at the last line, so the address needs to be adjusted to the beginning of the line.
 
@@ -131,7 +131,6 @@ paint:
 
       sw $t3, 0($s2)             # Stores the average pixel on the grey scale image's reserved space.
 
-
       add $s0, $s0, $s4           # Updates screen address.
       add $s2, $s2, $s4           # Updates the grey_scale_image pixel address.
       add $t8, $t8, $s3           # Updates file address.
@@ -151,16 +150,22 @@ paint:
   
   #jal thresholding_effect
 
-  #jal print_grey_scale_image
+  jal print_grey_scale_image
+
+  jal continue
 
   j exit
 
 # --------------------------------------------------------------------------- #
 #                                 Output file                                 #
 # --------------------------------------------------------------------------- #
+
+# Writes the output image on a file saved on input path given by the user.
+
 continue:
 
-  # Request output path from the user
+  # Requests output path from the user.
+
   la $a0, output_msg
   la $a1, output
   li $a2, 1
@@ -172,43 +177,54 @@ continue:
   lw $a0, output
   jal write_image_header
 
-  la $s0, screen + 1046528   # s0 is the start of the last line of the screen
+  la $s0, screen + 1046528   # s0 is the start of the last line of the screen.
   li $s1, 512                # How many lines are left?
   li $s2, 512                # How many pixels are left in the current line?
-  li $a2, 1536               # The size of each line when written in the file
+  li $a2, 1536               # The size of each line when written in the file.
 
-  lw $a0, output             # Load file decriptor
-  la $a1, buffer             # Load buffer address
+  lw $a0, output             # Load file decriptor.
+  la $a1, buffer             # Load buffer address.
 
-write:
-  lw $t0, 0($s0)             # Get color value
+  # Defines constants on registers to avoid the use of pseudo instructions.
 
-  sb $t0, 0($a1)             # Write blue component
-  srl $t0, $t0, 8            # Prepare green component
-  sb $t0, 1($a1)             # Write green component
-  srl $t0, $t0, 8            # Prepare red component
-  sb $t0, 2($a1)             # Write red component
+  li $t1, 1
+  li $t2, 4096
+  li $t3, 3
+  li $t4, 4
+  li $t5, 512
+  li $t6, 15
 
-  addi $s0, $s0, 4           # Update pointer to the screen
-  addi $a1, $a1, 3           # Update pointer to output buffer
-  addi $s2, $s2, -1          # Decrement counter of pixels written
-  bnez $s2, write            # Are we done with this line?
+  write:
+    
+    lw $t0, 0($s0)             # Get color value.
 
-  li $s2, 512                # Reset pixels counter
-  la $a1, buffer             # Reset buffer pointer
-  addi $s0, $s0, -4096       # Update pointer to the start of the previous line
+    sb $t0, 0($a1)             # Writes blue component.
+    srl $t0, $t0, 8            # Prepares green component.
+    sb $t0, 1($a1)             # Writes green component.
+    srl $t0, $t0, 8            # Prepares red component.
+    sb $t0, 2($a1)             # Writes red component.
 
-  li $v0, 15                 # Write file syscall code
-  syscall
+    add $s0, $s0, $t4          # Updates pointer to the screen.
+    add $a1, $a1, $t3          # Updates pointer to output buffer.
+    sub $s2, $s2, $t1          # Decrements counter of pixels written.
+    bnez $s2, write            # Are we done with this line?
 
-  addi $s1, $s1, -1          # Decrement line counter
-  bnez $s1, write            # Are we done?
+    move $s2, $t5              # Resets pixel's counter.
+    la $a1, buffer             # Resets buffer pointer.
+    sub $s0, $s0, $t2          # Updates pointer to the start of the previous line.
+
+    move $v0, $t6                 # Writes file's syscall code.
+    syscall
+
+    sub $s1, $s1, $t1          # Decrements line's counter.
+    bnez $s1, write            # Are we done?
 
 # --------------------------------------------------------------------------- #
 #                                  Functions                                  #
 # --------------------------------------------------------------------------- #
 
 exit:
+
   li $v0, 10
   syscall
 
