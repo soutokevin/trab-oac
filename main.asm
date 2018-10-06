@@ -21,10 +21,10 @@
 #                                Program variables                            #
 # --------------------------------------------------------------------------- #
   
-  path: .space 500
-  input: .word 0
-  output: .word 0
-  buffer: .space 1536
+  path: .space 500	# Path where the new image will be stored (includes file extension).
+  input: .word 0	  # String to read general inputs.
+  output: .word 0   # Output path to the new image file.
+  buffer: .space 1536 # Space to read or write an entire line of pixels.
   
 # --------------------------------------------------------------------------- #
 #                                Kernel variables                             #
@@ -42,86 +42,118 @@
   kernel_gx: .word -1,0,1,-2,0,2,-1,0,1
   kernel_gy: .word 1,2,1,0,0,0,-1,-2,-1  
 
-
 .text
 
 main:
-  # Request input path from the user
+
+  # Request input path from the user.
+
   la $a0, input_msg
   la $a1, input
-  li $a2, 0
+  move $a2, $zero
   jal open_file
 
-  # Validate input file header
+  # Validate input file header.
+
   lw $a0, input
   jal read_file_header
 
-  # Validate image header
+  # Validate image header.
+
   lw $a0, input
   jal read_image_header
 
+# Loads the image on BitMap Display and prepares the corresponding grey scale image.
+
 paint:
-  la $s0, screen + 1048576   # s0 is the end of the screen
-  li $s1, 512                # s1 will count how many lines are left to paint
 
-  la $s3, grey_scale_image   # $s3 holds the address to where the gray scale image will be stored.
-  addi $s3, $s3, 1048576
+  la $s0, screen + 1048576   # s0 is the end of the screen.
+  li $s1, 512                # s1 will count how many lines are left to paint.
 
-paint_line:
-  # Load 1536 bytes (a full line) of pixel data into the buffer
-  lw $a0, input
-  la $a1, buffer
-  li $a2, 1536
-  li $v0, 14
-  syscall
+  la $s2, grey_scale_image   # $s2 holds the address to where the gray scale image will be stored.
+  addi $s2, $s2, 1048576
 
-  bne $v0, $a2, invalid_file # Make sure a full line was read
+  # Constants used to avoid pseudo instructions.
 
-  la $t8, buffer             # Start of loaded file content
-  addi $t9, $t8, 1536        # End of loaded file content
+  li $s3, 3
+  li $s4, 4
+  li $s5, 1
+  li $s6, 2048
+  li $s7, 1536
 
-  addi $s0, $s0, -2048
-  addi $s3, $s3, -2048
+  # Load 1536 bytes (a full line) of pixel data into the.
 
-paint_pixel:
-  lbu $t0, 2($t8)            # Load red component
-  lbu $t1, 1($t8)            # Load green component
-  lbu $t2, 0($t8)            # Load blue component
+  paint_line:
+  
+    lw $a0, input
+    la $a1, buffer
+    move $a2, $s7
+    li $v0, 14
+    syscall
 
-  add $t3, $t0, $t1          # Sums the red and green components.
-  add $t3, $t3, $t2          # Sums the blue component to the other two.
-  div $t3, $t3, 3            # Gets the average value of the pixel.
+    bne $v0, $a2, invalid_file # Makes sure a full line was read.
+
+    la $t8, buffer             # Start of loaded file content.
+    add $t9, $t8, $s7        # End of loaded file content.
+
+    # The image is written backwards. It starts at the last line, so the address needs to be adjusted to the beginning of the line.
+
+    sub $s0, $s0, $s6       # Screen's address.
+    sub $s2, $s2, $s6       # Grey scale image address.
+
+    # Reads the bytes from the buffer, composes the RGB string, calculates the grey value and stores both on their addresses.
+
+    paint_pixel:
+  
+      lbu $t0, 2($t8)            # Loads red component.
+      lbu $t1, 1($t8)            # Loads green component.
+      lbu $t2, 0($t8)            # Loads blue component.
+
+      add $t3, $t0, $t1          # Sums the red and green components.
+      add $t3, $t3, $t2          # Sums the blue component to the other two.
+      div $t3, $t3, $s3            # Gets the average value of the pixel.
+
+      sll $t0, $t0, 16           # Prepares component to be joined (red   <<= 16).
+      sll $t1, $t1, 8            # Prepares component to be joined (green <<=  8).
+
+      or $t0, $t0, $t1           # t0 contains red and green components.
+      or $t0, $t0, $t2           # t0 contains all rgb components.
+
+      sw $t0, 0($s0)             # Paint pixel by storing on the screen.
+
+      # Do the same process to compose the grey scale RGB string of bits.
+
+      move $t0, $t3               
+      sll $t3, $t3, 16
+      or $t3, $t3, $t0
+      sll $t0, $t0, 8
+      or $t3, $t3,$t0
+
+      sw $t3, 0($s2)             # Stores the average pixel on the grey scale image's reserved space.
 
 
-  sll $t0, $t0, 16           # Prepare component to be joined; red   <<= 16
-  sll $t1, $t1, 8            # Prepare component to be joined; green <<=  8
+      add $s0, $s0, $s4           # Updates screen address.
+      add $s2, $s2, $s4           # Updates the grey_scale_image pixel address.
+      add $t8, $t8, $s3           # Updates file address.
+      add $t3, $zero, $zero
+      blt $t8, $t9, paint_pixel  # Are we done with this line?
 
-  or $t0, $t0, $t1           # t0 contains red and green components
-  or $t0, $t0, $t2           # t0 contains all rgb components
+      sub $s0, $s0, $s6
+      sub $s2, $s2, $s6
+      sub $s1, $s1, $s5          # Finished painting one line, decrement s1
+      bnez $s1, paint_line       # Are we done yet?
 
-  sw $t0, 0($s0)             # Paint pixel
+  #jal edge_detection
 
-  move $t0, $t3
-  sll $t3, $t3, 16
-  or $t3, $t3, $t0
-  sll $t0, $t0, 8
-  or $t3, $t3,$t0
+  #li $a0, 90
+  #la $a1, grey_scale_image
+  #la $a2, screen
+  
+  #jal thresholding_effect
 
-  sw $t3, 0($s3)             # Stores the average pixel on the grey image reserved space.
+  #jal print_grey_scale_image
 
-
-  addi $s0, $s0, 4           # Update screen address
-  addi $s3, $s3, 4           # Updates the grey_scale_image pixel address.
-  addi $t8, $t8, 3           # Update file address
-  add $t3, $zero, $zero
-  blt $t8, $t9, paint_pixel  # Are we done with this line?
-
-  addi $s0, $s0, -2048
-  addi $s3, $s3, -2048
-  addi $s1, $s1, -1          # Finished painting one line, decrement s1
-  bnez $s1, paint_line       # Are we done yet?
-
-  jal edge_detection
+  j exit
 
 # --------------------------------------------------------------------------- #
 #                                 Output file                                 #
@@ -183,6 +215,7 @@ exit:
 # a0: Address of a message to present the user
 # a1: Address to store the file descriptor
 # a2: Open mode
+
 open_file:
   addi $sp, $sp, -12
   sw $ra, 0($sp)
@@ -637,6 +670,7 @@ blur_effect:
 # --------------------------------------------------------------------------- #
 #                               Edge Detection                                #
 # --------------------------------------------------------------------------- #
+
 edge_detection:
 
   sub $sp, $sp, 4
@@ -853,31 +887,32 @@ edge_convolution:
 # --------------------------------------------------------------------------- #
 #                                 Thresholding                                #
 # --------------------------------------------------------------------------- #
+
 thresholding_effect:
 
   move $s0, $a0			# User's defined threshold value.
   move $s1, $a1			# Image's address.
   move $s2, $a2			# Output's address.
   addi $s3, $s1, 1048576	# Image's final address.
-  li $s4, 4
+  li $s4, 4			# Constant defined on register to improve performance.
 
-  sub $sp, $sp, $s4
+  sub $sp, $sp, $s4		# Stores the return address on the stack until the end of the procedure.
   sw $ra, 0($sp)
 
   threshold:
 
-    lbu $t0, 0($s1)
+    lbu $t0, 0($s1)		# Gets the pixel's component value.
 
-    blt $t0, $s0, low_threshold
-    li $t1, 255
+    blt $t0, $s0, low_threshold	# If the component is less than threshold the new value will be 0.
+    li $t1, 255			# If the component is greater than threshold the new value will be 255.
     j pixel_assembly
 
-    low_threshold:
+    low_threshold:		# If the new component's value is 0, there is no need to mount the RGB string.
 
       move $t0, $zero
       j pixel_writting
 
-    pixel_assembly:
+    pixel_assembly:		# If the new value is not zero, we mount the RGB string.
 
       move $t0, $t1
       sll $t0, $t0, 16
@@ -885,20 +920,21 @@ thresholding_effect:
       sll $t1, $t1, 8
       or $t0, $t0, $t1
 
-    pixel_writting:
+    pixel_writting:		# Stores the new component's value on the given output address.
 
       sw $t0, 0($s2)
       add $s1, $s1, $s4
       add $s2, $s2, $s4
 
       beq $s1, $s3, end_threshold
-      j threshold
+      j threshold		
 
-      end_threshold:
+      end_threshold:		# Resume to the caller.
 
         lw $ra, 0($sp)
         add $sp, $sp, $s4
         jr $ra
+
 
 
 
