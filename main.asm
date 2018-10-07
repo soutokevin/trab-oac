@@ -52,6 +52,15 @@
 
 main:
 
+  jal kernel_definition
+
+  la $a0, screen
+  la $a1, blur_kernel
+
+  jal blur_effect
+
+  j exit
+
   # Request input path from the user.
 
   la $a0, input_msg
@@ -156,7 +165,7 @@ paint:
 
   j menu
 
-  j exit
+
 
 # --------------------------------------------------------------------------- #
 #                                     Menu                                    #
@@ -216,6 +225,9 @@ menu:
 
 continue:
 
+  addi $sp, $sp, -4
+  sw $ra, 0($sp)
+
   # Requests output path from the user.
 
   la $a0, output_msg
@@ -270,6 +282,11 @@ continue:
 
     sub $s1, $s1, $t1          # Decrements line's counter.
     bnez $s1, write            # Are we done?
+    
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+    
 
 # --------------------------------------------------------------------------- #
 #                         Image maipulation functions                         #
