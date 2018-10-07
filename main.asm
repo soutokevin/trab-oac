@@ -18,6 +18,7 @@
   input_msg: .asciiz "Input path: "
   output_msg: .asciiz "Output path: "
   threshold_msg: .asciiz "Enter a positive number between 0-255 for threshold value: "
+  edge_msg: .asciiz "Please choose a predefined mask\n\n1 - 3x3 | 2- 5x5\n\nInput: "
   kernel_error_msg: .asciiz "Invalid argument for kernel generation.\n"
   kernel_line_msg: .asciiz "Please enter an odd positive number for kernel's lines: "
   kernel_column_msg: .asciiz "Please enter an odd positive number for kernel's columns: "
@@ -52,7 +53,7 @@
 
 main:
 
-  j menu_threshold
+  j menu_edge
 
   # Request input path from the user.
 
@@ -193,9 +194,81 @@ menu:
 
   menu_edge:
 
+    la $a0, edge_msg
+    li $v0, 4
+    syscall
+
+    li $v0, 5
+    syscall
+
+    beq $v0, 1, kernel_3x3
+    beq $v0, 2, kernel_5x5
+    j menu_edge  
+
+    kernel_3x3:
+
+      la $t6, kernel_size
+      li $t5, 9
+      sw $t5, 0($t6)
+
+      la $t6, kernel_columns
+      li $t5, 3
+      sw $t5, 0($t6)
+
+      la $t6, kernel_lines
+      sw $t5, 0($t6)
+
+      la $t6, kernel_column_distribution_number
+      li $t5, 1
+      sw $t5, 0($t6)
+
+      la $t6, kernel_line_distribution_number
+      sw $t5, 0($t6)
+
+      la $t6, kernel_line_number
+      sw $t5, 0($t6)
+
+      la $a0, kernel_gx_3_x_3
+      la $a1, kernel_gy_3_x_3
+
+      j edge_call
+
+    kernel_5x5:
+
+      la $t6, kernel_size
+      li $t5, 9
+      sw $t5, 0($t6)
+
+      la $t6, kernel_columns
+      li $t5, 3
+      sw $t5, 0($t6)
+
+      la $t6, kernel_lines
+      sw $t5, 0($t6)
+
+      la $t6, kernel_column_distribution_number
+      li $t5, 1
+      sw $t5, 0($t6)
+
+      la $t6, kernel_line_distribution_number
+      sw $t5, 0($t6)
+
+      la $t6, kernel_line_number
+      sw $t5, 0($t6)
+
+      la $a0, kernel_gx_5_x_5
+      la $a1, kernel_gy_5_x_5
+
+    edge_call:
+
+      jal edge_detection
+
+      j exit
+    
+
   menu_threshold:
 
-    la $a0, threshold_msg
+    la $a0, edge_msg
     li $v0, 4
     syscall
 
@@ -901,12 +974,14 @@ blur_effect:
 #                               Edge Detection                                #
 # --------------------------------------------------------------------------- #
 
+# $a0 refers to Gx and $a1 to Gy.
+
 edge_detection:
 
   sub $sp, $sp, 12
-  sw $ra, 0($sp)
+  sw $ra, 8($sp)
   sw $a0, 4($sp)
-  sw $a1, 8($sp)
+  sw $a1, 0($sp)
 
   # Apply blur effect on grey scale image.
 
@@ -918,7 +993,7 @@ edge_detection:
 
   # Build new image.
 
-  lw $a3, 8($sp)
+  lw $a3, 0($sp)
   lw $a1, 4($sp)
   addi $sp, $sp, 8
 
