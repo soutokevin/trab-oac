@@ -53,7 +53,11 @@
 
 main:
 
-  j menu_edge
+  la $a0, new_image
+
+  jal print_image
+
+  j exit
 
   # Request input path from the user.
 
