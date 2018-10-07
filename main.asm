@@ -52,14 +52,7 @@
 
 main:
 
-  jal kernel_definition
-
-  la $a0, screen
-  la $a1, blur_kernel
-
-  jal blur_effect
-
-  j exit
+  j menu_threshold
 
   # Request input path from the user.
 
@@ -917,11 +910,11 @@ edge_detection:
 
   # Apply blur effect on grey scale image.
 
-  la $a0, grey_scale_image
-  jal blur_effect
+  #la $a0, grey_scale_image
+  #jal blur_effect
 
-  la $a0, new_image
-  jal print_image
+  #la $a0, new_image
+  #jal print_image
 
   # Build new image.
 
@@ -934,17 +927,9 @@ edge_detection:
 
   jal edge_convolution
 
-  #la $a0, vertical_edge_image
-
-  #jal print_image
-
   lw $ra, 0($sp)
   addi $sp, $sp, 4
   jr $ra
-
-  # Build new image G(y). Horizontal edges.
-
-  # Compute the magnetude of the gradient and stores on the new image allocated space.
 
 edge_convolution:
 
@@ -958,34 +943,21 @@ edge_convolution:
   move $s4, $zero		# $s4 will keep the result of the vertical convolution.
   move $s5, $a3     # $s5 will keep the G(y) kernel's address.
   move $s6, $zero		# $s6 will store the result of the horizontal convolution.
+  la $s7, kernel_line_number  #Stores the kernel's address.
 
 
   li $t0, 1			# $t0 will perform as a pixel line counter (1 - 512). Tells wich pixel we're analyzing on the line.
   li $t1, 0			# $t1 will be our counter for the kernel pixel line. Tells wich element of the kernel line is being used.
   move $t3, $s1	# Address to retrieved pixel. That's the address of the ppixel being analyzed.
   li $t9, 0			# $t9 will hold the number of processed elements of the kernel.
+  la $t2, kernel_column_distribution_number
 
-  la $t5, kernel_size
-  la $t6, kernel_columns
-  lw $t5, 0($t5)
-  lw $t6, 0($t6)
+  lw $a0, 0($t2)          # Number of proportional columns to the right or lefft of the center of the convolution matrix.
 
-  move $a0, $t5			# Number of kernel's elements.
-  move $a1, $t6			# Number of kernel's columns.
+  la $t6, kernel_line_distribution_number
+  lw $a1, 0($t6) 
 
-  jal distribution_value
-
-  move $t5, $v0
-
-  la $t6, kernel_column_distribution_number
-  sw $t5, 0($t6)
-
-  move $a0, $t5			# Number of proportional columns to the right or lefft of the center of the convolution matrix.
-
-  la $t6, kernel_line_number
-  sw $t5, 0($t6)
-
-  move $a1, $t5			# First line number is the number of lines of the convolution matrix.
+  sw $a1, 0($s7)
 
   jal first_kernel_element_address_offset
 
@@ -1007,8 +979,7 @@ edge_convolution:
     blt $t4, $s1, pixel_convolution	# Ignores pixel with address lower than the beginning of the image.
     bgt $t4, $s2, pixel_convolution	# Ignores pixel with address higher than the end of the image.
 
-    la $t6, kernel_line_number
-    lw $t5, 0($t6)
+    lw $t5, 0($s7)
 
     move $a0, $t0
     move $a1, $t5
@@ -1053,14 +1024,12 @@ edge_convolution:
       beq $t9, $t5, end_pixel_convolution
 
       li $t1, 0					# $t1 will be our counter for the kernel pixel line.
-      la $t6, kernel_line_number
-      lw $t5, 0($t6)
+      lw $t5, 0($s7)
       addi $t5, $t5, -1
-      sw $t5, 0($t6)
+      sw $t5, 0($s7)
       move $a1, $t5
 
-      la $t6, kernel_column_distribution_number
-      lw $t5, 0($t6)
+      lw $t5, 0($t2)
       move $a0, $t5
 
       jal first_kernel_element_address_offset
@@ -1093,12 +1062,12 @@ edge_convolution:
     la $t5, kernel_columns		# Retrieves the number of columns of the kernel.
     lw $t7, 0($t5)			# Resets the limit of elements in one line of the kernel.
 
-    la $t6, kernel_column_distribution_number	# Retieves the kernel distribution number address.
-    lw $t5, 0($t6)			# Retieves the kernel distribution number value.
+    lw $t5, 0($t2)			# Retieves the kernel distribution number value.
     move $a0, $t5			# Sets the distribution number to $a0.
 
-    la $t6, kernel_line_number		# Gets the address of the kernel line number.
-    sw $t5, 0($t6)			# Resets the kernel line number with the distribution value.
+    la $t6, kernel_line_distribution_number		# Gets the address of the kernel line number.
+    lw $t5, 0($t6)			       # Gets the value of line distribution.
+    sw $t5, 0($s7)			# Resets the kernel line number with the distribution value.
 
     move $a1, $t5			# Sets the number of the line.
 
