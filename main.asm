@@ -53,6 +53,15 @@
 
 main:
 
+<<<<<<< HEAD
+=======
+  la $a0, new_image
+
+  jal print_image
+
+  j exit
+
+>>>>>>> dd329de9a0346fb6321f1e12c778549781568590
   # Request input path from the user.
 
   la $a0, input_msg
