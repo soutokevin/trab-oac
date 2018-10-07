@@ -53,8 +53,6 @@
 
 main:
 
-  j menu_edge
-
   # Request input path from the user.
 
   la $a0, input_msg
@@ -151,15 +149,7 @@ paint:
       sub $s1, $s1, $s5          # Finished painting one line, decrement s1
       bnez $s1, paint_line       # Are we done yet?
 
-  #jal edge_detection
-
-  #jal print_grey_scale_image
-
-  #jal continue
-
   j menu
-
-
 
 # --------------------------------------------------------------------------- #
 #                                     Menu                                    #
@@ -985,11 +975,11 @@ edge_detection:
 
   # Apply blur effect on grey scale image.
 
-  #la $a0, grey_scale_image
-  #jal blur_effect
+  la $a0, grey_scale_image
+  jal blur_effect
 
-  #la $a0, new_image
-  #jal print_image
+  la $a0, new_image
+  jal print_image
 
   # Build new image.
 
@@ -1016,18 +1006,18 @@ edge_convolution:
   addi $s2, $s1, 1048576	# $s2 will keep the final address of the original image.
   move $s3, $a2			# $s3 has the initial address of the output image.
   move $s4, $zero		# $s4 will keep the result of the vertical convolution.
-  move $s5, $a3     # $s5 will keep the G(y) kernel's address.
+  move $s5, $a3     		# $s5 will keep the G(y) kernel's address.
   move $s6, $zero		# $s6 will store the result of the horizontal convolution.
   la $s7, kernel_line_number  #Stores the kernel's address.
 
 
   li $t0, 1			# $t0 will perform as a pixel line counter (1 - 512). Tells wich pixel we're analyzing on the line.
   li $t1, 0			# $t1 will be our counter for the kernel pixel line. Tells wich element of the kernel line is being used.
-  move $t3, $s1	# Address to retrieved pixel. That's the address of the ppixel being analyzed.
+  move $t3, $s1			# Address to retrieved pixel. That's the address of the ppixel being analyzed.
   li $t9, 0			# $t9 will hold the number of processed elements of the kernel.
   la $t2, kernel_column_distribution_number
 
-  lw $a0, 0($t2)          # Number of proportional columns to the right or lefft of the center of the convolution matrix.
+  lw $a0, 0($t2)         	 # Number of proportional columns to the right or lefft of the center of the convolution matrix.
 
   la $t6, kernel_line_distribution_number
   lw $a1, 0($t6) 
