@@ -12,7 +12,7 @@
 #                                 Program mesages                             #
 # --------------------------------------------------------------------------- #
 
-  menu_msg: .asciiz "\n### Menu ###\n\nChoose an option below by inserting it's corresponding number\n\n1 - Apply blur effect. | 2 - Apply edge detection. | 3 - Apply threshold effect. | 4 - Exit\n\nInput: "
+  menu_msg: .asciiz "\n### Menu ###\n\nChoose an option below by inserting it's corresponding number\n\n1 - Apply blur effect. | 2 - Apply edge detection. | 3 - Apply threshold effect. | 4 - Save image | 5 - Exit\n\nInput: "
   open_error_msg: .asciiz "\nError while opening file\n"
   error_msg: .asciiz "\nInvalid file\n"
   input_msg: .asciiz "Input path: "
@@ -42,7 +42,7 @@
   kernel_column_distribution_number: .word 0	# Number that defines the range of elements around the kernel's center.
   kernel_line_distribution_number: .word 0	  # Number that defines the range of elements around the kernel's center.
   kernel_line_number: .word 0		# Holds the number of kernel's line being processed.
-  gaussian_kernel_3_x_3: .word 1,2,1,2,4,2,1,2,1
+  gaussian_kernel_3_x_3: .word 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
   blur_kernel: .space 400
   kernel_gx_3_x_3: .word 1,2,1,0,0,0,-1,-2,-1
   kernel_gy_3_x_3: .word -1,0,1,-2,0,2,-1,0,1
@@ -53,15 +53,6 @@
 
 main:
 
-<<<<<<< HEAD
-=======
-  la $a0, new_image
-
-  jal print_image
-
-  j exit
-
->>>>>>> dd329de9a0346fb6321f1e12c778549781568590
   # Request input path from the user.
 
   la $a0, input_msg
@@ -175,10 +166,13 @@ menu:
 
   blt $v0, 1, exit
   bgt $v0, 4, exit
-  beq $v0, 4, exit
+  beq $v0, 5, exit
   beq $v0, 1, menu_blur
   beq $v0, 2, menu_edge
   beq $v0, 3, menu_threshold
+  beq $v0, 4, continue
+
+  j menu
   
   menu_blur:
 
@@ -189,7 +183,9 @@ menu:
 
     jal blur_effect
 
-    jal print_new_image    
+    jal print_new_image
+
+    j menu
 
   menu_edge:
 
@@ -235,18 +231,18 @@ menu:
     kernel_5x5:
 
       la $t6, kernel_size
-      li $t5, 9
+      li $t5, 25
       sw $t5, 0($t6)
 
       la $t6, kernel_columns
-      li $t5, 3
+      li $t5, 5
       sw $t5, 0($t6)
 
       la $t6, kernel_lines
       sw $t5, 0($t6)
 
       la $t6, kernel_column_distribution_number
-      li $t5, 1
+      li $t5, 2
       sw $t5, 0($t6)
 
       la $t6, kernel_line_distribution_number
@@ -262,12 +258,11 @@ menu:
 
       jal edge_detection
 
-      j exit
-    
+      j menu  
 
   menu_threshold:
 
-    la $a0, edge_msg
+    la $a0, threshold_msg
     li $v0, 4
     syscall
 
@@ -278,9 +273,9 @@ menu:
     la $a1, grey_scale_image
     la $a2, screen
 
-    jal thresholding_effect    
+    jal thresholding_effect
 
-  j exit
+    j menu    
 
 # --------------------------------------------------------------------------- #
 #                                 Output file                                 #
@@ -290,8 +285,8 @@ menu:
 
 continue:
 
-  addi $sp, $sp, -4
-  sw $ra, 0($sp)
+  #addi $sp, $sp, -4
+  #sw $ra, 0($sp)
 
   # Requests output path from the user.
 
@@ -348,10 +343,11 @@ continue:
     sub $s1, $s1, $t1          # Decrements line's counter.
     bnez $s1, write            # Are we done?
     
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
-    jr $ra
+    #lw $ra, 0($sp)
+    #addi $sp, $sp, 4
+    #jr $ra
     
+    j menu
 
 # --------------------------------------------------------------------------- #
 #                         Image maipulation functions                         #
@@ -957,7 +953,7 @@ blur_effect:
     move $t9, $zero # Resets the kernel element counter.
     move $t1, $zero # Resets the the kernel line element counter.
 
-    bgt $t3, $s3, end_blur
+    beq $t3, $s3, end_blur
     blt $t0, 513, pixel_processing
 
     li $t0, 1
@@ -985,6 +981,7 @@ edge_detection:
   # Apply blur effect on grey scale image.
 
   la $a0, grey_scale_image
+  la $a1, gaussian_kernel_3_x_3
   jal blur_effect
 
   la $a0, new_image
@@ -1015,7 +1012,7 @@ edge_convolution:
   addi $s2, $s1, 1048576	# $s2 will keep the final address of the original image.
   move $s3, $a2			# $s3 has the initial address of the output image.
   move $s4, $zero		# $s4 will keep the result of the vertical convolution.
-  move $s5, $a3     		# $s5 will keep the G(y) kernel's address.
+  move $s5, $a3     # $s5 will keep the G(y) kernel's address.
   move $s6, $zero		# $s6 will store the result of the horizontal convolution.
   la $s7, kernel_line_number  #Stores the kernel's address.
 
@@ -1063,6 +1060,7 @@ edge_convolution:
     add $t6, $t3, $v0
 
     blt $t4, $t6, pixel_convolution
+    beq $s1, $t6, end_pixel_convolution
 
     addi $t6, $t6, 2048
 
@@ -1155,7 +1153,7 @@ edge_convolution:
     move $t1, $zero	# Resets the counter for the element of the kernel line.
 
     beq $t0, 512, end_pixel_convolution
-    bgt $t3, $s2, end_edge_convolution
+    beq $t3, $s2, end_edge_convolution
     blt $t0, 513, pixel_convolution
 
     li $t0, 1
